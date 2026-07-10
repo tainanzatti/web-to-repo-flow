@@ -7,6 +7,8 @@ import {
   fetchMaterialLinks,
   insertMaterialLink,
   deleteMaterialLink,
+  fetchAiMaterial,
+  upsertAiMaterial,
   type SavedLink,
 } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
@@ -57,13 +59,21 @@ export function MaterialModal({
   useEffect(() => {
     if (activeTab === 'leiseca') return
     if (cache[activeTab]) return
-    const stored = loadString(cacheKey(activeTab))
+    const tab = activeTab
+    // 1) Cache local (rápido, apenas temporário)
+    const stored = loadString(cacheKey(tab))
     setCache((p) => ({
       ...p,
-      [activeTab]: stored
-        ? { status: 'ready', text: stored, fresh: false }
-        : { status: 'idle' },
+      [tab]: stored ? { status: 'ready', text: stored, fresh: false } : { status: 'idle' },
     }))
+    // 2) Banco de dados = fonte oficial
+    if (user) {
+      fetchAiMaterial(user.id, discId, topicId, tab).then((dbText) => {
+        if (!dbText) return
+        saveString(cacheKey(tab), dbText)
+        setCache((p) => ({ ...p, [tab]: { status: 'ready', text: dbText, fresh: false } }))
+      })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab])
 
@@ -77,6 +87,7 @@ export function MaterialModal({
       })
       setCache((p) => ({ ...p, [tab]: { status: 'ready', text, fresh: true } }))
       saveString(cacheKey(tab), text)
+      if (user) await upsertAiMaterial(user.id, discId, topicId, tab, text)
     } catch (err) {
       setCache((p) => ({
         ...p,

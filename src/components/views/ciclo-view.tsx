@@ -34,6 +34,8 @@ import {
 } from '@/lib/curriculum'
 import { generateAI } from '@/lib/ai-client'
 import { loadString, saveString } from '@/lib/storage'
+import { fetchDailyBriefing, upsertDailyBriefing } from '@/lib/db'
+import { useAuth } from '@/lib/auth-context'
 import { SectionLabel, AmmoBelt, PesoBadge, MarkdownLite, TypewriterMarkdown } from '@/components/ui-bits'
 import { StudyWheel } from '@/components/study-wheel'
 
