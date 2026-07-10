@@ -1,29 +1,333 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
+import { useEffect, useState } from 'react'
+import {
+  PieChart,
+  LayoutGrid,
+  BookOpen,
+  BarChart3,
+  ClipboardList,
+  LineChart,
+  Trophy,
+  User,
+  Shield,
+  Menu,
+  X,
+  LogOut,
+  Loader2,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+import {
+  CURRICULUM,
+  ROTATION_ORDER,
+  SEED_ENTRY,
+  allocateMinutes,
+  selectActiveTopics,
+  disciplineTopicsWithMastery,
+  computeCycleStats,
+  maxTopicsForCycle,
+  type AllocatedTopic,
+  type Lancamento,
+} from '@/lib/curriculum'
+import { useAuth } from '@/lib/auth-context'
+import { fetchLancamentos, insertLancamentos, deleteLancamento as deleteLancamentoDb, deleteAllLancamentos } from '@/lib/db'
+import { CicloView } from '@/components/views/ciclo-view'
+import { NucleoView } from '@/components/views/nucleo-view'
+import { MateriaisView } from '@/components/views/materiais-view'
+import { DesempenhoView } from '@/components/views/desempenho-view'
+import { LancamentoView } from '@/components/views/lancamento-view'
+import { ComparativoView } from '@/components/views/comparativo-view'
+import { RankingView } from '@/components/views/ranking-view'
+import { PerfilView } from '@/components/views/perfil-view'
+import { ConcluirModal } from '@/components/concluir-modal'
+import { MaterialModal } from '@/components/material-modal'
 
-export const Route = createFileRoute("/")({
-  head: () => ({
-    meta: [
-      { title: "Your App" },
-      { name: "description", content: "Replace this with a one-sentence description of your app." },
-      { property: "og:title", content: "Your App" },
-      { property: "og:description", content: "Replace this with a one-sentence description of your app." },
+export const Route = createFileRoute('/')({
+  component: OperacaoPMSC,
+})
+
+type ViewId =
+  | 'ciclo'
+  | 'nucleo'
+  | 'materiais'
+  | 'desempenho'
+  | 'lancamento'
+  | 'comparativo'
+  | 'ranking'
+  | 'perfil'
+
+const NAV: { section: string; items: { id: ViewId; label: string; icon: LucideIcon }[] }[] = [
+  {
+    section: 'Home',
+    items: [
+      { id: 'ciclo', label: 'Ciclo', icon: PieChart },
+      { id: 'nucleo', label: 'Núcleo', icon: LayoutGrid },
+      { id: 'materiais', label: 'Materiais', icon: BookOpen },
+      { id: 'desempenho', label: 'Desempenho', icon: BarChart3 },
     ],
-  }),
-  component: Index,
-});
+  },
+  {
+    section: 'Gestão de estudos',
+    items: [
+      { id: 'lancamento', label: 'Lançamento de questões', icon: ClipboardList },
+      { id: 'comparativo', label: 'Comparativo', icon: LineChart },
+      { id: 'ranking', label: 'Ranking', icon: Trophy },
+    ],
+  },
+  {
+    section: 'Configurações',
+    items: [{ id: 'perfil', label: 'Meu perfil', icon: User }],
+  },
+]
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
-function Index() {
+const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = {
+  ciclo: { title: 'Ciclo de Estudos', subtitle: 'Rotação automática guiada pelos pesos do edital' },
+  nucleo: { title: 'Núcleo', subtitle: 'Progresso de revisão por assunto do edital' },
+  materiais: { title: 'Materiais', subtitle: '[PMSC] Soldado 2026 — materiais por assunto' },
+  desempenho: { title: 'Desempenho', subtitle: 'Acompanhe seu progresso pessoal' },
+  lancamento: { title: 'Lançamento de questões', subtitle: 'Registre seus resultados diários' },
+  comparativo: { title: 'Comparativo', subtitle: 'Seus resultados em relação aos outros alunos' },
+  ranking: { title: 'Ranking', subtitle: 'Suas posições no ranking da plataforma' },
+  perfil: { title: 'Meu perfil', subtitle: 'Assinatura, plano e dados pessoais' },
+}
+
+function OperacaoPMSC() {
+  const navigate = useNavigate()
+  const { user, loading: authLoading, signOut } = useAuth()
+  const [view, setView] = useState<ViewId>('ciclo')
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [dataLoading, setDataLoading] = useState(true)
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [material, setMaterial] = useState<{ discId: string; topicId: string } | null>(null)
+  const [concluir, setConcluir] = useState<{ discId: string; topics: AllocatedTopic[] } | null>(null)
+
+  // Exige login para acessar o app
+  useEffect(() => {
+    if (!authLoading && !user) {
+      navigate({ to: '/login' })
+    }
+  }, [authLoading, user, navigate])
+
+  // Carrega os lançamentos do usuário logado a partir do Supabase
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    setDataLoading(true)
+    fetchLancamentos(user.id).then((rows) => {
+      if (cancelled) return
+      setLancamentos(rows.length > 0 ? rows : [SEED_ENTRY])
+      setDataLoading(false)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [user])
+
+  function openConcluir(discId: string) {
+    const cycleStats = computeCycleStats(lancamentos)
+    const maxCount = maxTopicsForCycle(cycleStats.completedCycles + 1)
+    const all = disciplineTopicsWithMastery(lancamentos, discId)
+    const active = selectActiveTopics(all, discId, lancamentos, maxCount)
+    setConcluir({ discId, topics: allocateMinutes(active) })
+  }
+
+  async function confirmConcluir(entries: Omit<Lancamento, 'id'>[]) {
+    if (!user) return
+    const saved = await insertLancamentos(user.id, entries)
+    setLancamentos((prev) => [...prev, ...saved])
+    setConcluir(null)
+    setView('ciclo')
+  }
+
+  async function addLancamento(l: Omit<Lancamento, 'id'>) {
+    if (!user) return
+    const saved = await insertLancamentos(user.id, [l])
+    setLancamentos((prev) => [...prev, ...saved])
+  }
+
+  async function deleteLancamento(id: string) {
+    setLancamentos((prev) => prev.filter((l) => l.id !== id))
+    await deleteLancamentoDb(id)
+  }
+
+  async function resetData() {
+    if (!user) return
+    await deleteAllLancamentos(user.id)
+    setLancamentos([SEED_ENTRY])
+  }
+
+  async function handleSignOut() {
+    await signOut()
+    navigate({ to: '/login' })
+  }
+
+  if (authLoading || !user || dataLoading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <Loader2 className="animate-spin text-primary" size={24} />
+      </div>
+    )
+  }
+
+  const nextDiscAfter = (discId: string) => {
+    const idx = ROTATION_ORDER.indexOf(discId as (typeof ROTATION_ORDER)[number])
+    return CURRICULUM[ROTATION_ORDER[(idx + 1) % ROTATION_ORDER.length]].name
+  }
+
+  const meta = VIEW_TITLES[view]
+
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
+    <div className="flex min-h-screen bg-background">
+      {/* Sidebar */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-sidebar-border bg-sidebar transition-transform lg:static lg:translate-x-0 ${
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center gap-2.5 px-5 pb-5 pt-6">
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/15">
+            <Shield size={17} className="text-primary" />
+          </span>
+          <div className="leading-tight">
+            <div className="font-display text-sm font-bold tracking-wide text-foreground">
+              OPERAÇÃO <span className="text-primary">PMSC</span>
+            </div>
+            <div className="font-mono text-[9px] tracking-[0.16em] text-faint">SOLDADO 2026</div>
+          </div>
+        </div>
+
+        <nav className="flex-1 space-y-5 overflow-y-auto px-3 pb-4">
+          {NAV.map((group) => (
+            <div key={group.section}>
+              <div className="mb-1.5 px-2 font-mono text-[9px] uppercase tracking-[0.16em] text-faint">
+                {group.section}
+              </div>
+              <div className="space-y-0.5">
+                {group.items.map((item) => {
+                  const active = view === item.id
+                  return (
+                    <button
+                      key={item.id}
+                      onClick={() => {
+                        setView(item.id)
+                        setMobileNavOpen(false)
+                      }}
+                      className={`flex w-full items-center gap-2.5 rounded-md px-2.5 py-2 text-left text-[13px] font-medium transition-all duration-200 ease-in-out active:scale-[0.97] ${
+                        active
+                          ? 'bg-sidebar-active text-foreground'
+                          : 'text-muted-foreground hover:bg-card-raised hover:text-foreground'
+                      }`}
+                      style={active ? { boxShadow: 'inset 2px 0 0 var(--primary)' } : undefined}
+                    >
+                      <item.icon size={15} className={active ? 'text-primary' : 'text-faint'} />
+                      {item.label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </nav>
+
+        <div className="border-t border-sidebar-border px-5 py-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-card-raised font-display text-xs font-bold text-primary">
+              {(user.email ?? '??').slice(0, 2).toUpperCase()}
+            </span>
+            <div className="min-w-0 flex-1 leading-tight">
+              <div className="truncate text-[12px] font-semibold text-foreground">
+                {user.email}
+              </div>
+              <div className="text-[10px] text-faint">[PMSC] Soldado 2026</div>
+            </div>
+            <button
+              onClick={handleSignOut}
+              aria-label="Sair"
+              className="shrink-0 rounded-md p-1.5 text-faint transition-colors hover:bg-card-raised hover:text-primary"
+            >
+              <LogOut size={14} />
+            </button>
+          </div>
+        </div>
+      </aside>
+
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/60 lg:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Conteúdo */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="flex items-center gap-3 border-b border-border-soft px-4 py-4 sm:px-6">
+          <button
+            className="rounded-md border border-border p-1.5 text-muted-foreground lg:hidden"
+            onClick={() => setMobileNavOpen((o) => !o)}
+            aria-label="Abrir menu"
+          >
+            {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
+          </button>
+          <div>
+            <h1 className="font-display text-lg font-bold text-foreground">{meta.title}</h1>
+            <p className="text-[11px] text-muted-foreground">{meta.subtitle}</p>
+          </div>
+        </header>
+
+        <main className="flex-1 px-4 py-6 sm:px-6">
+          <div
+            key={view}
+            className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-in-out"
+          >
+            {view === 'ciclo' && (
+              <CicloView
+                lancamentos={lancamentos}
+                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+                onConcluir={openConcluir}
+              />
+            )}
+            {view === 'nucleo' && (
+              <NucleoView
+                lancamentos={lancamentos}
+                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+              />
+            )}
+            {view === 'materiais' && (
+              <MateriaisView
+                lancamentos={lancamentos}
+                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+              />
+            )}
+            {view === 'desempenho' && <DesempenhoView lancamentos={lancamentos} />}
+            {view === 'lancamento' && (
+              <LancamentoView
+                lancamentos={lancamentos}
+                onAdd={addLancamento}
+                onDelete={deleteLancamento}
+              />
+            )}
+            {view === 'comparativo' && <ComparativoView lancamentos={lancamentos} />}
+            {view === 'ranking' && <RankingView lancamentos={lancamentos} userName="Tainan Zatti" />}
+            {view === 'perfil' && <PerfilView lancamentos={lancamentos} onReset={resetData} />}
+          </div>
+        </main>
+      </div>
+
+      {material && (
+        <MaterialModal
+          discId={material.discId}
+          topicId={material.topicId}
+          onClose={() => setMaterial(null)}
+        />
+      )}
+      {concluir && (
+        <ConcluirModal
+          discId={concluir.discId}
+          topics={concluir.topics}
+          nextDiscName={nextDiscAfter(concluir.discId)}
+          onConfirm={confirmConcluir}
+          onClose={() => setConcluir(null)}
+        />
+      )}
     </div>
-  );
+  )
 }
