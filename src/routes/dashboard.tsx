@@ -75,12 +75,14 @@ export default function DashboardPage() {
               <div>
                 <p className="text-sm text-gray-600">Data de Nascimento</p>
                 <p className="text-lg font-medium">
-                  {new Date(profile.date_of_birth).toLocaleDateString('pt-BR')}
+                  {profile.date_of_birth
+                    ? new Date(profile.date_of_birth).toLocaleDateString('pt-BR')
+                    : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-sm text-gray-600">CPF</p>
-                <p className="text-lg font-medium">{profile.cpf}</p>
+                <p className="text-lg font-medium">{profile.cpf ?? '—'}</p>
               </div>
             </div>
             <div className="pt-4 border-t">
