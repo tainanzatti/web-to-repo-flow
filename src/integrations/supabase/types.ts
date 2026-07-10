@@ -14,7 +14,189 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_materials: {
+        Row: {
+          content: string
+          created_at: string
+          disciplina_id: string
+          id: string
+          kind: string
+          topico_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          disciplina_id: string
+          id?: string
+          kind: string
+          topico_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          disciplina_id?: string
+          id?: string
+          kind?: string
+          topico_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      daily_briefings: {
+        Row: {
+          briefing_date: string
+          content: string
+          created_at: string
+          id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          briefing_date: string
+          content: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          briefing_date?: string
+          content?: string
+          created_at?: string
+          id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      lancamentos: {
+        Row: {
+          acertos: number
+          created_at: string
+          data: string
+          disciplina_id: string
+          id: string
+          minutos: number
+          quantidade: number
+          topico_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          acertos: number
+          created_at?: string
+          data: string
+          disciplina_id: string
+          id?: string
+          minutos?: number
+          quantidade: number
+          topico_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          acertos?: number
+          created_at?: string
+          data?: string
+          disciplina_id?: string
+          id?: string
+          minutos?: number
+          quantidade?: number
+          topico_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      material_links: {
+        Row: {
+          created_at: string
+          disciplina_id: string
+          id: string
+          topico_id: string
+          updated_at: string
+          url: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          disciplina_id: string
+          id?: string
+          topico_id: string
+          updated_at?: string
+          url: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          disciplina_id?: string
+          id?: string
+          topico_id?: string
+          updated_at?: string
+          url?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          cpf: string | null
+          created_at: string
+          date_of_birth: string | null
+          email: string
+          full_name: string
+          id: string
+          updated_at: string
+        }
+        Insert: {
+          cpf?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email: string
+          full_name?: string
+          id: string
+          updated_at?: string
+        }
+        Update: {
+          cpf?: string | null
+          created_at?: string
+          date_of_birth?: string | null
+          email?: string
+          full_name?: string
+          id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          created_at: string
+          id: string
+          settings: Json
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          settings?: Json
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          settings?: Json
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
