@@ -96,7 +96,9 @@ function Heatmap({ lancamentos }: { lancamentos: Lancamento[] }) {
 }
 
 function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
-  const todayKey = `briefing:${new Date().toISOString().slice(0, 10)}`
+  const { user } = useAuth()
+  const today = new Date().toISOString().slice(0, 10)
+  const todayKey = `briefing:${today}`
   const [state, setState] = useState<
     | { status: 'idle' | 'loading' }
     | { status: 'ready'; text: string; fresh: boolean }
@@ -104,10 +106,19 @@ function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
   >({ status: 'idle' })
 
   useEffect(() => {
+    // 1) Cache local (rápido, apenas temporário)
     const stored = loadString(todayKey)
     if (stored) setState({ status: 'ready', text: stored, fresh: false })
+    // 2) Banco de dados = fonte oficial
+    if (user) {
+      fetchDailyBriefing(user.id, today).then((dbText) => {
+        if (!dbText) return
+        saveString(todayKey, dbText)
+        setState({ status: 'ready', text: dbText, fresh: false })
+      })
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [user?.id])
 
   async function generate() {
     setState({ status: 'loading' })
@@ -125,10 +136,12 @@ function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
       const text = await generateAI({ kind: 'briefing', summary })
       setState({ status: 'ready', text, fresh: true })
       saveString(todayKey, text)
+      if (user) await upsertDailyBriefing(user.id, today, text)
     } catch (err) {
       setState({ status: 'error', message: err instanceof Error ? err.message : String(err) })
     }
   }
+
 
   return (
     <div className="rounded-xl border border-primary/30 bg-card p-4 transition-all duration-300 ease-in-out">
