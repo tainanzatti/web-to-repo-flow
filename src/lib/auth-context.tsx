@@ -2,12 +2,12 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 import { User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
-interface UserProfile {
+export interface UserProfile {
   id: string;
   email: string;
   full_name: string;
-  date_of_birth: string;
-  cpf: string;
+  date_of_birth: string | null;
+  cpf: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,14 +36,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Fetch user profile
+  // Busca o perfil do usuário no banco
   const fetchProfile = async (userId: string) => {
     try {
       const { data, error } = await supabase
         .from("profiles")
         .select("*")
         .eq("id", userId)
-        .single();
+        .maybeSingle();
 
       if (error) throw error;
       setProfile(data);
@@ -53,39 +53,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  // Check auth status on mount and subscribe to changes
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
-
-        if (session?.user) {
-          setUser(session.user);
-          await fetchProfile(session.user.id);
-        }
-      } catch (error) {
-        console.error("Error initializing auth:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
-
-    // Subscribe to auth changes
+    // Ouvinte de mudanças de sessão (login, logout, refresh de token)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setUser(session?.user ?? null);
       if (session?.user) {
-        setUser(session.user);
-        await fetchProfile(session.user.id);
+        // defer para evitar deadlock dentro do callback
+        setTimeout(() => fetchProfile(session.user.id), 0);
       } else {
-        setUser(null);
         setProfile(null);
       }
     });
+
+    // Restaura a sessão existente ao abrir o app
+    supabase.auth
+      .getSession()
+      .then(({ data: { session } }) => {
+        setUser(session?.user ?? null);
+        if (session?.user) fetchProfile(session.user.id);
+      })
+      .finally(() => setLoading(false));
 
     return () => subscription?.unsubscribe();
   }, []);
@@ -97,91 +86,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     dateOfBirth: string,
     cpf: string
   ) => {
-    try {
-      // Create auth user
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-      });
+    // O perfil é criado automaticamente por um gatilho no banco
+    // a partir dos metadados enviados aqui.
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
+        data: {
+          full_name: fullName,
+          date_of_birth: dateOfBirth,
+          cpf,
+        },
+      },
+    });
 
-      if (error) throw error;
-      if (!data.user) throw new Error("User creation failed");
+    if (error) throw error;
+    if (!data.user) throw new Error("User creation failed");
 
-      // Create profile
-      const { error: profileError } = await supabase.from("profiles").insert({
-        id: data.user.id,
-        email,
-        full_name: fullName,
-        date_of_birth: dateOfBirth,
-        cpf,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-
-      if (profileError) throw profileError;
-
+    if (data.session) {
       setUser(data.user);
       await fetchProfile(data.user.id);
-    } catch (error) {
-      console.error("Sign up error:", error);
-      throw error;
     }
   };
 
   const signIn = async (email: string, password: string) => {
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
 
-      if (error) throw error;
-      if (data.user) {
-        setUser(data.user);
-        await fetchProfile(data.user.id);
-      }
-    } catch (error) {
-      console.error("Sign in error:", error);
-      throw error;
+    if (error) throw error;
+    if (data.user) {
+      setUser(data.user);
+      await fetchProfile(data.user.id);
     }
   };
 
   const signOut = async () => {
-    try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-      setUser(null);
-      setProfile(null);
-    } catch (error) {
-      console.error("Sign out error:", error);
-      throw error;
-    }
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
+    setUser(null);
+    setProfile(null);
   };
 
   const resetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error("Reset password error:", error);
-      throw error;
-    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/reset-password`,
+    });
+    if (error) throw error;
   };
 
-  const updatePassword = async (newPassword: string, token: string) => {
-    try {
-      // Note: In a real app, you'd need to handle the token verification
-      // This is typically done server-side for security
-      const { error } = await supabase.auth.updateUser({
-        password: newPassword,
-      });
-      if (error) throw error;
-    } catch (error) {
-      console.error("Update password error:", error);
-      throw error;
-    }
+  const updatePassword = async (newPassword: string, _token: string) => {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+    if (error) throw error;
   };
 
   return (

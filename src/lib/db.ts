@@ -1,7 +1,12 @@
 import { supabase } from './supabase'
 import type { Lancamento } from './curriculum'
 
-// ---------- Lançamentos ----------
+// ============================================================================
+// Camada central de acesso ao banco (Lovable Cloud).
+// Toda leitura/escrita de dados do usuário passa por aqui.
+// ============================================================================
+
+// ---------- Lançamentos (sessões de estudo / questões respondidas) ----------
 
 export async function fetchLancamentos(userId: string): Promise<Lancamento[]> {
   const { data, error } = await supabase
@@ -113,4 +118,110 @@ export async function insertMaterialLink(
 export async function deleteMaterialLink(id: string): Promise<void> {
   const { error } = await supabase.from('material_links').delete().eq('id', id)
   if (error) throw error
+}
+
+// ---------- Materiais gerados por IA (lei seca, resumo, questões) ----------
+
+export type AiMaterialKind = 'leiseca' | 'resumo' | 'questoes'
+
+export async function fetchAiMaterial(
+  userId: string,
+  discId: string,
+  topicId: string,
+  kind: AiMaterialKind
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('ai_materials')
+    .select('content')
+    .eq('user_id', userId)
+    .eq('disciplina_id', discId)
+    .eq('topico_id', topicId)
+    .eq('kind', kind)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Erro ao buscar material de IA:', error)
+    return null
+  }
+  return data?.content ?? null
+}
+
+export async function upsertAiMaterial(
+  userId: string,
+  discId: string,
+  topicId: string,
+  kind: AiMaterialKind,
+  content: string
+): Promise<void> {
+  const { error } = await supabase.from('ai_materials').upsert(
+    {
+      user_id: userId,
+      disciplina_id: discId,
+      topico_id: topicId,
+      kind,
+      content,
+    },
+    { onConflict: 'user_id,disciplina_id,topico_id,kind' }
+  )
+  if (error) console.error('Erro ao salvar material de IA:', error)
+}
+
+// ---------- Briefing diário ----------
+
+export async function fetchDailyBriefing(
+  userId: string,
+  date: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('daily_briefings')
+    .select('content')
+    .eq('user_id', userId)
+    .eq('briefing_date', date)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Erro ao buscar briefing:', error)
+    return null
+  }
+  return data?.content ?? null
+}
+
+export async function upsertDailyBriefing(
+  userId: string,
+  date: string,
+  content: string
+): Promise<void> {
+  const { error } = await supabase.from('daily_briefings').upsert(
+    { user_id: userId, briefing_date: date, content },
+    { onConflict: 'user_id,briefing_date' }
+  )
+  if (error) console.error('Erro ao salvar briefing:', error)
+}
+
+// ---------- Configurações do usuário ----------
+
+export async function fetchUserSettings(
+  userId: string
+): Promise<Record<string, unknown>> {
+  const { data, error } = await supabase
+    .from('user_settings')
+    .select('settings')
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Erro ao buscar configurações:', error)
+    return {}
+  }
+  return (data?.settings as Record<string, unknown>) ?? {}
+}
+
+export async function upsertUserSettings(
+  userId: string,
+  settings: Record<string, unknown>
+): Promise<void> {
+  const { error } = await supabase
+    .from('user_settings')
+    .upsert({ user_id: userId, settings }, { onConflict: 'user_id' })
+  if (error) console.error('Erro ao salvar configurações:', error)
 }
