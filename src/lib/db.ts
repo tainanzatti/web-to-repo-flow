@@ -223,6 +223,6 @@ export async function upsertUserSettings(
 ): Promise<void> {
   const { error } = await supabase
     .from('user_settings')
-    .upsert({ user_id: userId, settings }, { onConflict: 'user_id' })
+    .upsert({ user_id: userId, settings: settings as Json }, { onConflict: 'user_id' })
   if (error) console.error('Erro ao salvar configurações:', error)
 }
