@@ -1,8 +1,9 @@
-import { Crown, RotateCcw, Loader2, Check } from 'lucide-react'
+import { Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
+import { useTheme, type ThemeMode } from '@/lib/theme-context'
 import { supabase } from '@/lib/supabase'
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
 
 export function PerfilView({ lancamentos, onReset }: Props) {
   const { user, profile } = useAuth()
+  const { theme, setTheme } = useTheme()
   const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
   const dias = new Set(lancamentos.map((l) => l.data)).size
 
