@@ -1,6 +1,9 @@
-import { Crown, RotateCcw } from 'lucide-react'
+import { Crown, RotateCcw, Loader2, Check } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
+import { useAuth } from '@/lib/auth-context'
+import { supabase } from '@/lib/supabase'
 
 type Props = {
   lancamentos: Lancamento[]
@@ -8,8 +11,47 @@ type Props = {
 }
 
 export function PerfilView({ lancamentos, onReset }: Props) {
+  const { user, profile } = useAuth()
   const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
   const dias = new Set(lancamentos.map((l) => l.data)).size
+
+  const [fullName, setFullName] = useState('')
+  const [cpf, setCpf] = useState('')
+  const [phone, setPhone] = useState('')
+  const [dateOfBirth, setDateOfBirth] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+
+  useEffect(() => {
+    if (!profile) return
+    setFullName(profile.full_name || '')
+    setCpf(profile.cpf || '')
+    setDateOfBirth(profile.date_of_birth || '')
+    // phone comes back on profile once schema is regenerated
+    setPhone(((profile as unknown as { phone?: string }).phone) || '')
+  }, [profile])
+
+  async function handleSave() {
+    if (!user) return
+    setSaving(true)
+    setSaved(false)
+    const { error } = await supabase
+      .from('profiles')
+      .update({
+        full_name: fullName,
+        cpf: cpf || null,
+        date_of_birth: dateOfBirth || null,
+        phone: phone || null,
+      } as never)
+      .eq('id', user.id)
+    setSaving(false)
+    if (error) {
+      console.error('Erro ao salvar perfil:', error)
+      return
+    }
+    setSaved(true)
+    setTimeout(() => setSaved(false), 2000)
+  }
 
   return (
     <div className="space-y-6">
@@ -38,15 +80,24 @@ export function PerfilView({ lancamentos, onReset }: Props) {
       <div className="rounded-2xl border border-border-soft bg-card p-5">
         <SectionLabel>INFORMAÇÕES PESSOAIS</SectionLabel>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Nome" defaultValue="Tainan" />
-          <Field label="Sobrenome" defaultValue="Zatti" />
-          <Field label="CPF" defaultValue="063.842.079-23" />
-          <Field label="Email" defaultValue="tainan@exemplo.com" />
-          <Field label="Data de nascimento" defaultValue="19/07/1994" />
-          <Field label="Celular" defaultValue="(48) 99132-0999" />
+          <Field label="Nome completo" value={fullName} onChange={setFullName} />
+          <Field label="Email" value={user?.email || ''} onChange={() => {}} disabled />
+          <Field label="CPF" value={cpf} onChange={setCpf} />
+          <Field label="Data de nascimento" value={dateOfBirth} onChange={setDateOfBirth} type="date" />
+          <Field label="Celular" value={phone} onChange={setPhone} />
         </div>
-        <div className="mt-5 flex justify-end">
-          <button className="rounded-lg bg-primary px-5 py-2 font-display text-sm font-bold text-primary-foreground transition hover:brightness-110">
+        <div className="mt-5 flex items-center justify-end gap-3">
+          {saved && (
+            <span className="flex items-center gap-1 text-xs text-[color:var(--success)]">
+              <Check size={14} /> Salvo
+            </span>
+          )}
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 font-display text-sm font-bold text-primary-foreground transition hover:brightness-110 disabled:opacity-60"
+          >
+            {saving && <Loader2 size={14} className="animate-spin" />}
             Salvar
           </button>
         </div>
@@ -56,8 +107,9 @@ export function PerfilView({ lancamentos, onReset }: Props) {
         <SectionLabel>DADOS DO APLICATIVO</SectionLabel>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="max-w-md text-[12px] leading-relaxed text-muted-foreground">
-            Todo o seu histórico de estudos fica salvo neste dispositivo. Reiniciar volta ao estado
-            inicial (apenas o lançamento de demonstração permanece).
+            Todo o seu histórico de estudos fica salvo na sua conta. Reiniciar apaga permanentemente
+            todos os seus lançamentos — a conta volta ao estado inicial (zero questões, zero
+            progresso).
           </p>
           <button
             onClick={onReset}
@@ -91,11 +143,29 @@ function MiniStat({ label, value }: { label: string; value: number }) {
   )
 }
 
-function Field({ label, defaultValue }: { label: string; defaultValue: string }) {
+function Field({
+  label,
+  value,
+  onChange,
+  disabled,
+  type = 'text',
+}: {
+  label: string
+  value: string
+  onChange: (v: string) => void
+  disabled?: boolean
+  type?: string
+}) {
   return (
     <div>
       <label className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</label>
-      <input defaultValue={defaultValue} className="input-base" />
+      <input
+        type={type}
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        className="input-base disabled:opacity-60"
+      />
     </div>
   )
 }
