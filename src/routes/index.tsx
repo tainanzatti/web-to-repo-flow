@@ -19,7 +19,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   CURRICULUM,
   ROTATION_ORDER,
-  SEED_ENTRY,
   allocateMinutes,
   selectActiveTopics,
   disciplineTopicsWithMastery,
