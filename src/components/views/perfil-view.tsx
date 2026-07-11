@@ -1,8 +1,9 @@
-import { Crown, RotateCcw, Loader2, Check } from 'lucide-react'
+import { Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
+import { useTheme, type ThemeMode } from '@/lib/theme-context'
 import { supabase } from '@/lib/supabase'
 
 type Props = {
@@ -12,6 +13,7 @@ type Props = {
 
 export function PerfilView({ lancamentos, onReset }: Props) {
   const { user, profile } = useAuth()
+  const { theme, setTheme } = useTheme()
   const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
   const dias = new Set(lancamentos.map((l) => l.data)).size
 
@@ -100,6 +102,39 @@ export function PerfilView({ lancamentos, onReset }: Props) {
             {saving && <Loader2 size={14} className="animate-spin" />}
             Salvar
           </button>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border-soft bg-card p-5">
+        <SectionLabel>APARÊNCIA</SectionLabel>
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <p className="max-w-md text-[12px] leading-relaxed text-muted-foreground">
+            Escolha o tema da plataforma. A opção Automático segue a preferência do seu sistema
+            operacional. Sua escolha é salva na sua conta.
+          </p>
+          <div className="flex gap-2">
+            {([
+              { id: 'light', label: 'Claro', Icon: Sun },
+              { id: 'dark', label: 'Escuro', Icon: Moon },
+              { id: 'auto', label: 'Auto', Icon: Monitor },
+            ] as { id: ThemeMode; label: string; Icon: typeof Sun }[]).map(({ id, label, Icon }) => {
+              const active = theme === id
+              return (
+                <button
+                  key={id}
+                  onClick={() => setTheme(id)}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${
+                    active
+                      ? 'border-primary bg-primary text-primary-foreground'
+                      : 'border-border-soft bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                  }`}
+                >
+                  <Icon size={14} />
+                  {label}
+                </button>
+              )
+            })}
+          </div>
         </div>
       </div>
 

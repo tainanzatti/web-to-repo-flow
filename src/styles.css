@@ -51,7 +51,8 @@
   --radius-2xl: calc(var(--radius) * 1.8);
 }
 
-:root {
+:root,
+.dark {
   color-scheme: dark;
   --background: #0a0a0c;
   --foreground: #f4f5f8;
@@ -89,6 +90,44 @@
   --success: #2ecc71;
 
   --radius: 0.7rem;
+}
+
+.light {
+  color-scheme: light;
+  --background: #f7f7f9;
+  --foreground: #14151a;
+  --card: #ffffff;
+  --card-foreground: #14151a;
+  --card-raised: #ffffff;
+  --popover: #ffffff;
+  --popover-foreground: #14151a;
+  --primary: #c81028;
+  --primary-foreground: #ffffff;
+  --primary-dim: #fde0e4;
+  --secondary: #f0f1f4;
+  --secondary-foreground: #14151a;
+  --muted: #f0f1f4;
+  --muted-foreground: #5b616d;
+  --faint: #8a909b;
+  --accent: #eceef2;
+  --accent-foreground: #14151a;
+  --destructive: #c81028;
+  --border: #dfe1e6;
+  --border-soft: #ebedf1;
+  --input: #eceef2;
+  --ring: #c81028;
+
+  --sidebar: #ffffff;
+  --sidebar-foreground: #14151a;
+  --sidebar-active: #fde0e4;
+  --sidebar-border: #ebedf1;
+
+  --tier-none: #a67326;
+  --tier-weak: #b23b2e;
+  --tier-mid: #b8681f;
+  --tier-good: #2f8964;
+  --tier-mastered: #1a5c40;
+  --success: #16a34a;
 }
 
 @layer base {
