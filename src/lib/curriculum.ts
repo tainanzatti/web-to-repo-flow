@@ -202,15 +202,6 @@ export const ROTATION_ORDER = [
   'redacao',
 ] as const
 
-export const SEED_ENTRY: Lancamento = {
-  id: 'seed-1',
-  disciplinaId: 'legislacaoInstitucional',
-  topicoId: 'estatuto',
-  quantidade: 10,
-  acertos: 10,
-  minutos: 60,
-  data: '2026-07-02',
-}
 
 export const ALL_TOPICS_COUNT = Object.values(CURRICULUM).reduce(
   (a, d) => a + d.topics.length,

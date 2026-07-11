@@ -151,6 +151,7 @@ export type Database = {
           email: string
           full_name: string
           id: string
+          phone: string | null
           updated_at: string
         }
         Insert: {
@@ -160,6 +161,7 @@ export type Database = {
           email: string
           full_name?: string
           id: string
+          phone?: string | null
           updated_at?: string
         }
         Update: {
@@ -169,6 +171,7 @@ export type Database = {
           email?: string
           full_name?: string
           id?: string
+          phone?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -202,7 +205,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_ranking_stats: {
+        Args: never
+        Returns: {
+          dias_ativos: number
+          full_name: string
+          pct_acertos: number
+          total_acertos: number
+          total_minutos: number
+          total_questoes: number
+          user_id: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

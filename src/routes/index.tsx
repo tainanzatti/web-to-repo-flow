@@ -19,7 +19,6 @@ import type { LucideIcon } from 'lucide-react'
 import {
   CURRICULUM,
   ROTATION_ORDER,
-  SEED_ENTRY,
   allocateMinutes,
   selectActiveTopics,
   disciplineTopicsWithMastery,
@@ -114,7 +113,7 @@ function OperacaoPMSC() {
     setDataLoading(true)
     fetchLancamentos(user.id).then((rows) => {
       if (cancelled) return
-      setLancamentos(rows.length > 0 ? rows : [SEED_ENTRY])
+      setLancamentos(rows)
       setDataLoading(false)
     })
     return () => {
@@ -152,7 +151,7 @@ function OperacaoPMSC() {
   async function resetData() {
     if (!user) return
     await deleteAllLancamentos(user.id)
-    setLancamentos([SEED_ENTRY])
+    setLancamentos([])
   }
 
   async function handleSignOut() {
@@ -306,7 +305,7 @@ function OperacaoPMSC() {
               />
             )}
             {view === 'comparativo' && <ComparativoView lancamentos={lancamentos} />}
-            {view === 'ranking' && <RankingView lancamentos={lancamentos} userName="Tainan Zatti" />}
+            {view === 'ranking' && <RankingView />}
             {view === 'perfil' && <PerfilView lancamentos={lancamentos} onReset={resetData} />}
           </div>
         </main>
