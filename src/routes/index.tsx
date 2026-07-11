@@ -305,7 +305,7 @@ function OperacaoPMSC() {
               />
             )}
             {view === 'comparativo' && <ComparativoView lancamentos={lancamentos} />}
-            {view === 'ranking' && <RankingView lancamentos={lancamentos} userName="Tainan Zatti" />}
+            {view === 'ranking' && <RankingView />}
             {view === 'perfil' && <PerfilView lancamentos={lancamentos} onReset={resetData} />}
           </div>
         </main>
