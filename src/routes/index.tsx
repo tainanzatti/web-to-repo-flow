@@ -238,13 +238,15 @@ function OperacaoPMSC() {
               </div>
               <div className="text-[10px] text-faint">[PMSC] Soldado 2026</div>
             </div>
-            <button
-              onClick={handleSignOut}
-              aria-label="Sair"
-              className="shrink-0 rounded-md p-1.5 text-faint transition-colors hover:bg-card-raised hover:text-primary"
-            >
-              <LogOut size={14} />
-            </button>
+            <IconTip label="Sair da conta" side="top">
+              <button
+                onClick={handleSignOut}
+                aria-label="Sair"
+                className="shrink-0 rounded-md p-1.5 text-faint transition-colors hover:bg-card-raised hover:text-primary"
+              >
+                <LogOut size={14} />
+              </button>
+            </IconTip>
           </div>
         </div>
       </aside>
