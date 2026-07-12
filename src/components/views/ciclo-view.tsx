@@ -36,7 +36,7 @@ import { generateAI } from '@/lib/ai-client'
 import { loadString, saveString } from '@/lib/storage'
 import { fetchDailyBriefing, upsertDailyBriefing } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
-import { SectionLabel, AmmoBelt, PesoBadge, MarkdownLite, TypewriterMarkdown } from '@/components/ui-bits'
+import { SectionLabel, AmmoBelt, PesoBadge, MarkdownLite, TypewriterMarkdown, IconTip } from '@/components/ui-bits'
 import { StudyWheel } from '@/components/study-wheel'
 
 type Props = {
@@ -316,13 +316,15 @@ export function CicloView({ lancamentos, onOpenMaterial, onConcluir }: Props) {
                   <span className="w-8 shrink-0 text-right font-mono text-[10px] text-foreground">
                     {t.minutes}′
                   </span>
-                  <button
-                    onClick={() => onOpenMaterial(selectedDiscId, t.id)}
-                    className="shrink-0 rounded-sm p-1 text-primary transition-transform duration-200 hover:scale-125 active:scale-95"
-                    title="Material de estudo"
-                  >
-                    <FileText size={12} />
-                  </button>
+                  <IconTip label="Abrir materiais deste tópico" side="left">
+                    <button
+                      onClick={() => onOpenMaterial(selectedDiscId, t.id)}
+                      className="shrink-0 rounded-sm p-1 text-primary transition-transform duration-200 hover:scale-125 active:scale-95"
+                      aria-label="Material de estudo"
+                    >
+                      <FileText size={12} />
+                    </button>
+                  </IconTip>
                 </div>
               )
             })}

@@ -1,6 +1,25 @@
 import React, { useEffect, useState } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { tierInfo, explainAllocation, type AllocatedTopic } from '@/lib/curriculum'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+
+// ============================== IconTip: botão com tooltip ==============================
+export function IconTip({
+  label,
+  side = 'top',
+  children,
+}: {
+  label: string
+  side?: 'top' | 'bottom' | 'left' | 'right'
+  children: React.ReactNode
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent side={side}>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
 
 // ============================== Rótulo de seção ==============================
 export function SectionLabel({

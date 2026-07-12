@@ -39,6 +39,7 @@ import { RankingView } from '@/components/views/ranking-view'
 import { PerfilView } from '@/components/views/perfil-view'
 import { ConcluirModal } from '@/components/concluir-modal'
 import { MaterialModal } from '@/components/material-modal'
+import { IconTip } from '@/components/ui-bits'
 
 export const Route = createFileRoute('/')({
   component: OperacaoPMSC,
@@ -238,13 +239,15 @@ function OperacaoPMSC() {
               </div>
               <div className="text-[10px] text-faint">[PMSC] Soldado 2026</div>
             </div>
-            <button
-              onClick={handleSignOut}
-              aria-label="Sair"
-              className="shrink-0 rounded-md p-1.5 text-faint transition-colors hover:bg-card-raised hover:text-primary"
-            >
-              <LogOut size={14} />
-            </button>
+            <IconTip label="Sair da conta" side="top">
+              <button
+                onClick={handleSignOut}
+                aria-label="Sair"
+                className="shrink-0 rounded-md p-1.5 text-faint transition-colors hover:bg-card-raised hover:text-primary"
+              >
+                <LogOut size={14} />
+              </button>
+            </IconTip>
           </div>
         </div>
       </aside>
@@ -259,13 +262,15 @@ function OperacaoPMSC() {
       {/* Conteúdo */}
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center gap-3 border-b border-border-soft px-4 py-4 sm:px-6">
-          <button
-            className="rounded-md border border-border p-1.5 text-muted-foreground lg:hidden"
-            onClick={() => setMobileNavOpen((o) => !o)}
-            aria-label="Abrir menu"
-          >
-            {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
-          </button>
+          <IconTip label={mobileNavOpen ? 'Fechar menu' : 'Abrir menu'} side="bottom">
+            <button
+              className="rounded-md border border-border p-1.5 text-muted-foreground lg:hidden"
+              onClick={() => setMobileNavOpen((o) => !o)}
+              aria-label="Abrir menu"
+            >
+              {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
+            </button>
+          </IconTip>
           <div>
             <h1 className="font-display text-lg font-bold text-foreground">{meta.title}</h1>
             <p className="text-[11px] text-muted-foreground">{meta.subtitle}</p>
