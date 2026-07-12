@@ -9,6 +9,7 @@ import {
   movingAverageMastery,
   type Lancamento,
 } from '@/lib/curriculum'
+import { IconTip } from '@/components/ui-bits'
 
 type Props = {
   lancamentos: Lancamento[]
@@ -68,12 +69,15 @@ function DisciplineColumn({
 
       <div className="mb-3 flex items-center justify-between rounded-lg border border-border-soft bg-card-raised px-3 py-2.5">
         <span className="font-display text-sm font-bold text-foreground">{disc.name}</span>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          className="text-faint transition hover:text-foreground"
-        >
-          <RefreshCw size={13} className={open ? '' : 'opacity-40'} />
-        </button>
+        <IconTip label={open ? 'Recolher tópicos' : 'Expandir tópicos'} side="left">
+          <button
+            onClick={() => setOpen((o) => !o)}
+            aria-label={open ? 'Recolher' : 'Expandir'}
+            className="text-faint transition hover:text-foreground"
+          >
+            <RefreshCw size={13} className={open ? '' : 'opacity-40'} />
+          </button>
+        </IconTip>
       </div>
       {open && (
         <div className="space-y-2.5">
@@ -115,13 +119,15 @@ function DisciplineColumn({
                       <Lock size={11} className="text-faint" />
                     )}
                   </div>
-                  <button
-                    onClick={() => onOpenMaterial(discId, t.id)}
-                    className="rounded p-1 text-primary transition hover:scale-125"
-                    title="Material de estudo"
-                  >
-                    <FileText size={13} />
-                  </button>
+                  <IconTip label="Abrir materiais deste tópico" side="left">
+                    <button
+                      onClick={() => onOpenMaterial(discId, t.id)}
+                      aria-label="Material de estudo"
+                      className="rounded p-1 text-primary transition hover:scale-125"
+                    >
+                      <FileText size={13} />
+                    </button>
+                  </IconTip>
                 </div>
                 <div className="mt-2 h-1 overflow-hidden rounded-full bg-card-raised">
                   <div
