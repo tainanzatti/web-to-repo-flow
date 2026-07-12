@@ -196,3 +196,12 @@
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--primary) 18%, transparent);
   }
 }
+
+.wheel-sector {
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+.wheel-sector:hover {
+  transform: scale(1.03);
+  opacity: 1 !important;
+}
+

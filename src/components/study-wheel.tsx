@@ -92,13 +92,22 @@ export function StudyWheel({ lancamentos, activeDiscId, onSelect, size = 540 }: 
               ? 'color-mix(in srgb, var(--primary) 16%, var(--card-raised))'
               : 'var(--card-raised)'
 
+          const pctAcertos =
+            agg.quantidade > 0 ? Math.round((agg.acertos / agg.quantidade) * 100) : null
+          const tooltip = `${CURRICULUM[discId].name}\n${
+            studied
+              ? `${agg.quantidade} questões · ${pctAcertos}% acertos`
+              : 'ainda sem lançamentos'
+          }`
+
           return (
             <g
               key={discId}
-              className="cursor-pointer transition-[opacity,transform] duration-200"
+              className="wheel-sector cursor-pointer transition-[opacity,transform] duration-200"
               onClick={() => onSelect?.(discId)}
-              style={{ opacity: isActive ? 1 : studied ? 0.96 : 0.82 }}
+              style={{ opacity: isActive ? 1 : studied ? 0.96 : 0.82, transformOrigin: `${cx}px ${cy}px` }}
             >
+              <title>{tooltip}</title>
               <path
                 d={sectorPath(
                   cx,
