@@ -57,17 +57,17 @@ function StatCard({
   accent: string
 }) {
   return (
-    <div className="card-hover rounded-xl border border-border-soft bg-card p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+    <div className="card-hover flex h-[104px] flex-col justify-between rounded-xl border border-border-soft bg-card p-4">
+      <div className="flex items-center justify-between">
+        <span className="truncate text-[11px] font-medium text-muted-foreground">{label}</span>
         <span
-          className="flex h-7 w-7 items-center justify-center rounded-md"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
           style={{ background: `color-mix(in srgb, ${accent} 16%, transparent)` }}
         >
           <Icon size={14} style={{ color: accent }} />
         </span>
       </div>
-      <div className="font-mono text-2xl font-bold text-foreground">{value}</div>
+      <div className="truncate font-mono text-2xl font-bold text-foreground tabular-nums">{value}</div>
     </div>
   )
 }
