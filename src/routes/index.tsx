@@ -298,20 +298,20 @@ function OperacaoPMSC() {
             {view === 'ciclo' && (
               <CicloView
                 lancamentos={lancamentos}
-                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+                onOpenMaterial={openMaterial}
                 onConcluir={openConcluir}
               />
             )}
             {view === 'nucleo' && (
               <NucleoView
                 lancamentos={lancamentos}
-                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+                onOpenMaterial={openMaterial}
               />
             )}
             {view === 'materiais' && (
               <MateriaisView
                 lancamentos={lancamentos}
-                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+                onOpenMaterial={openMaterial}
               />
             )}
             {view === 'desempenho' && <DesempenhoView lancamentos={lancamentos} />}
