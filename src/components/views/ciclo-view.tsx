@@ -57,17 +57,17 @@ function StatCard({
   accent: string
 }) {
   return (
-    <div className="card-hover rounded-xl border border-border-soft bg-card p-4">
-      <div className="mb-2 flex items-center justify-between">
-        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
+    <div className="card-hover flex h-[104px] flex-col justify-between rounded-xl border border-border-soft bg-card p-4">
+      <div className="flex items-center justify-between">
+        <span className="truncate text-[11px] font-medium text-muted-foreground">{label}</span>
         <span
-          className="flex h-7 w-7 items-center justify-center rounded-md"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md"
           style={{ background: `color-mix(in srgb, ${accent} 16%, transparent)` }}
         >
           <Icon size={14} style={{ color: accent }} />
         </span>
       </div>
-      <div className="font-mono text-2xl font-bold text-foreground">{value}</div>
+      <div className="truncate font-mono text-2xl font-bold text-foreground tabular-nums">{value}</div>
     </div>
   )
 }
@@ -144,7 +144,7 @@ function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
 
 
   return (
-    <div className="rounded-xl border border-primary/30 bg-card p-4 transition-all duration-300 ease-in-out">
+    <div className="rounded-xl border border-primary/30 bg-card p-4 min-h-[220px] flex flex-col transition-all duration-300 ease-in-out">
       <div className="mb-3 flex items-center gap-1.5">
         <Sparkles size={13} className="text-primary" />
         <span className="font-mono text-[10px] font-semibold tracking-[0.15em] text-primary">
@@ -230,7 +230,7 @@ export function CicloView({ lancamentos, onOpenMaterial, onConcluir }: Props) {
   const isHero = selectedDiscId === heroDiscId
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_1fr]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_1fr]">
       {/* Coluna esquerda: roda + métricas */}
       <div className="space-y-6">
         <div className="rounded-2xl border border-border-soft bg-card p-5">
