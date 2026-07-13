@@ -1,5 +1,5 @@
-import { memo, Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor } from 'lucide-react'
+import { memo, useEffect, useState } from 'react'
 import { type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
