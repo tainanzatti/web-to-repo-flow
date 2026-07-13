@@ -144,7 +144,7 @@ function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
 
 
   return (
-    <div className="rounded-xl border border-primary/30 bg-card p-4 transition-all duration-300 ease-in-out">
+    <div className="rounded-xl border border-primary/30 bg-card p-4 min-h-[220px] flex flex-col transition-all duration-300 ease-in-out">
       <div className="mb-3 flex items-center gap-1.5">
         <Sparkles size={13} className="text-primary" />
         <span className="font-mono text-[10px] font-semibold tracking-[0.15em] text-primary">
