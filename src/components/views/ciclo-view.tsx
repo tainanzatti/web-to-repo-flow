@@ -230,7 +230,7 @@ export function CicloView({ lancamentos, onOpenMaterial, onConcluir }: Props) {
   const isHero = selectedDiscId === heroDiscId
 
   return (
-    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.15fr_1fr]">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.15fr_1fr]">
       {/* Coluna esquerda: roda + métricas */}
       <div className="space-y-6">
         <div className="rounded-2xl border border-border-soft bg-card p-5">
