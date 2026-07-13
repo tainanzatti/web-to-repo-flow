@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { ChevronDown, Folder, FileText, Sparkles } from 'lucide-react'
 import { CURRICULUM, ROTATION_ORDER, type Lancamento } from '@/lib/curriculum'
 
@@ -7,7 +7,7 @@ type Props = {
   onOpenMaterial: (discId: string, topicId: string) => void
 }
 
-export function MateriaisView({ onOpenMaterial }: Props) {
+function MateriaisViewInner({ onOpenMaterial }: Props) {
   const [open, setOpen] = useState<string | null>(ROTATION_ORDER[0])
 
   return (
@@ -66,3 +66,5 @@ export function MateriaisView({ onOpenMaterial }: Props) {
     </div>
   )
 }
+
+export const MateriaisView = memo(MateriaisViewInner)

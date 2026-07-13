@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
   RadarChart,
@@ -30,7 +30,7 @@ const RIVAL_DISC_PCT: Record<string, number> = {
   redacao: 55,
 }
 
-export function ComparativoView({ lancamentos }: Props) {
+function ComparativoViewInner({ lancamentos }: Props) {
   const [win, setWin] = useState<number | null>(30)
 
   const filtered = useMemo(() => {
@@ -178,3 +178,5 @@ function CompareCard({
     </div>
   )
 }
+
+export const ComparativoView = memo(ComparativoViewInner)

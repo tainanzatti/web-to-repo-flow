@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import {
   ResponsiveContainer,
   RadarChart,
@@ -28,7 +28,7 @@ function pctInWindow(lancamentos: Lancamento[], discId: string, days: number): n
   return q > 0 ? Math.round((a / q) * 100) : null
 }
 
-export function DesempenhoView({ lancamentos }: Props) {
+function DesempenhoViewInner({ lancamentos }: Props) {
   const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
   const totalA = lancamentos.reduce((a, e) => a + e.acertos, 0)
   const totalMin = lancamentos.reduce((a, e) => a + (e.minutos || 0), 0)
@@ -199,3 +199,5 @@ function PctCell({ value }: { value: number | null }) {
   const color = value >= 75 ? 'var(--success)' : value >= 50 ? 'var(--tier-mid)' : 'var(--primary)'
   return <span style={{ color }}>{value}%</span>
 }
+
+export const DesempenhoView = memo(DesempenhoViewInner)
