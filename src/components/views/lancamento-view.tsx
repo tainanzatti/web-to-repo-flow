@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Send, Trash2, Filter, ClipboardList } from 'lucide-react'
 import { CURRICULUM, ROTATION_ORDER, type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
@@ -16,7 +16,7 @@ const WINDOWS = [
   { label: '7 dias', days: 7 },
 ] as const
 
-export function LancamentoView({ lancamentos, onAdd, onDelete }: Props) {
+function LancamentoViewInner({ lancamentos, onAdd, onDelete }: Props) {
   const [discId, setDiscId] = useState('')
   const [topicId, setTopicId] = useState('')
   const [quantidade, setQuantidade] = useState('')
@@ -223,3 +223,5 @@ export function LancamentoView({ lancamentos, onAdd, onDelete }: Props) {
 function FieldLabel({ children }: { children: React.ReactNode }) {
   return <label className="mb-1 block text-[11px] font-medium text-muted-foreground">{children}</label>
 }
+
+export const LancamentoView = memo(LancamentoViewInner)

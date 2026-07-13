@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { RefreshCw, FileText, Lock, Repeat } from 'lucide-react'
 import {
   CURRICULUM,
@@ -22,7 +22,7 @@ function reviewColor(count: number, target: number): string {
   return lerpColor('#3b6fb5', '#2f9e5f', t)
 }
 
-export function NucleoView({ lancamentos, onOpenMaterial }: Props) {
+function NucleoViewInner({ lancamentos, onOpenMaterial }: Props) {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border-soft bg-card px-4 py-3">
@@ -143,3 +143,5 @@ function DisciplineColumn({
     </div>
   )
 }
+
+export const NucleoView = memo(NucleoViewInner)

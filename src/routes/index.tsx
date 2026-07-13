@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from '@tanstack/react-router'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import {
   PieChart,
   LayoutGrid,
@@ -122,38 +122,51 @@ function OperacaoPMSC() {
     }
   }, [user])
 
-  function openConcluir(discId: string) {
-    const cycleStats = computeCycleStats(lancamentos)
-    const maxCount = maxTopicsForCycle(cycleStats.completedCycles + 1)
-    const all = disciplineTopicsWithMastery(lancamentos, discId)
-    const active = selectActiveTopics(all, discId, lancamentos, maxCount)
-    setConcluir({ discId, topics: allocateMinutes(active) })
-  }
+  const openConcluir = useCallback(
+    (discId: string) => {
+      const cycleStats = computeCycleStats(lancamentos)
+      const maxCount = maxTopicsForCycle(cycleStats.completedCycles + 1)
+      const all = disciplineTopicsWithMastery(lancamentos, discId)
+      const active = selectActiveTopics(all, discId, lancamentos, maxCount)
+      setConcluir({ discId, topics: allocateMinutes(active) })
+    },
+    [lancamentos],
+  )
 
-  async function confirmConcluir(entries: Omit<Lancamento, 'id'>[]) {
-    if (!user) return
-    const saved = await insertLancamentos(user.id, entries)
-    setLancamentos((prev) => [...prev, ...saved])
-    setConcluir(null)
-    setView('ciclo')
-  }
+  const confirmConcluir = useCallback(
+    async (entries: Omit<Lancamento, 'id'>[]) => {
+      if (!user) return
+      const saved = await insertLancamentos(user.id, entries)
+      setLancamentos((prev) => [...prev, ...saved])
+      setConcluir(null)
+      setView('ciclo')
+    },
+    [user],
+  )
 
-  async function addLancamento(l: Omit<Lancamento, 'id'>) {
-    if (!user) return
-    const saved = await insertLancamentos(user.id, [l])
-    setLancamentos((prev) => [...prev, ...saved])
-  }
+  const addLancamento = useCallback(
+    async (l: Omit<Lancamento, 'id'>) => {
+      if (!user) return
+      const saved = await insertLancamentos(user.id, [l])
+      setLancamentos((prev) => [...prev, ...saved])
+    },
+    [user],
+  )
 
-  async function deleteLancamento(id: string) {
+  const deleteLancamento = useCallback(async (id: string) => {
     setLancamentos((prev) => prev.filter((l) => l.id !== id))
     await deleteLancamentoDb(id)
-  }
+  }, [])
 
-  async function resetData() {
+  const resetData = useCallback(async () => {
     if (!user) return
     await deleteAllLancamentos(user.id)
     setLancamentos([])
-  }
+  }, [user])
+
+  const openMaterial = useCallback((discId: string, topicId: string) => {
+    setMaterial({ discId, topicId })
+  }, [])
 
   async function handleSignOut() {
     await signOut()
@@ -285,20 +298,20 @@ function OperacaoPMSC() {
             {view === 'ciclo' && (
               <CicloView
                 lancamentos={lancamentos}
-                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+                onOpenMaterial={openMaterial}
                 onConcluir={openConcluir}
               />
             )}
             {view === 'nucleo' && (
               <NucleoView
                 lancamentos={lancamentos}
-                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+                onOpenMaterial={openMaterial}
               />
             )}
             {view === 'materiais' && (
               <MateriaisView
                 lancamentos={lancamentos}
-                onOpenMaterial={(discId, topicId) => setMaterial({ discId, topicId })}
+                onOpenMaterial={openMaterial}
               />
             )}
             {view === 'desempenho' && <DesempenhoView lancamentos={lancamentos} />}

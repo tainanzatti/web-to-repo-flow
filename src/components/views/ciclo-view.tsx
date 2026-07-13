@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import {
   Target,
   Clock,
@@ -189,11 +189,11 @@ function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
   )
 }
 
-export function CicloView({ lancamentos, onOpenMaterial, onConcluir }: Props) {
-  const cycleStats = computeCycleStats(lancamentos)
+function CicloViewInner({ lancamentos, onOpenMaterial, onConcluir }: Props) {
+  const cycleStats = useMemo(() => computeCycleStats(lancamentos), [lancamentos])
   const cycleNumber = cycleStats.completedCycles + 1
   const maxCount = maxTopicsForCycle(cycleNumber)
-  const heroDiscId = nextHeroDiscipline(lancamentos)
+  const heroDiscId = useMemo(() => nextHeroDiscipline(lancamentos), [lancamentos])
   const [selectedDiscId, setSelectedDiscId] = useState(heroDiscId)
 
   // Rotação automática: ao concluir uma sessão, o "herói" avança na sequência
@@ -208,20 +208,40 @@ export function CicloView({ lancamentos, onOpenMaterial, onConcluir }: Props) {
     return allocateMinutes(active)
   }, [lancamentos, selectedDiscId, maxCount])
 
-  const streak = computeStreak(lancamentos)
-  const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
-  const totalA = lancamentos.reduce((a, e) => a + e.acertos, 0)
-  const totalMin = lancamentos.reduce((a, e) => a + (e.minutos || 0), 0)
-  const pctGlobal = totalQ > 0 ? Math.round((totalA / totalQ) * 100) : 0
-  const diasEstudados = new Set(lancamentos.map((l) => l.data)).size
-  const qHora = totalMin > 0 ? (totalQ / (totalMin / 60)).toFixed(1) : '0.0'
+  const streak = useMemo(() => computeStreak(lancamentos), [lancamentos])
 
-  let tocados = 0
-  Object.keys(CURRICULUM).forEach((discId) => {
-    CURRICULUM[discId].topics.forEach((t) => {
-      if (movingAverageMastery(lancamentos, discId, t.id) !== null) tocados++
-    })
-  })
+  // Agregações em uma única passada sobre os lançamentos.
+  const totals = useMemo(() => {
+    let q = 0
+    let a = 0
+    let m = 0
+    const days = new Set<string>()
+    for (const l of lancamentos) {
+      q += l.quantidade
+      a += l.acertos
+      m += l.minutos || 0
+      days.add(l.data)
+    }
+    return {
+      totalQ: q,
+      totalA: a,
+      totalMin: m,
+      pctGlobal: q > 0 ? Math.round((a / q) * 100) : 0,
+      diasEstudados: days.size,
+      qHora: m > 0 ? (q / (m / 60)).toFixed(1) : '0.0',
+    }
+  }, [lancamentos])
+  const { totalQ, totalMin, pctGlobal, diasEstudados, qHora } = totals
+
+  const tocados = useMemo(() => {
+    let n = 0
+    for (const discId of Object.keys(CURRICULUM)) {
+      for (const t of CURRICULUM[discId].topics) {
+        if (movingAverageMastery(lancamentos, discId, t.id) !== null) n++
+      }
+    }
+    return n
+  }, [lancamentos])
 
   const dominadoTopic = heroTopics.find((t) => tierInfo(t.mastery).key === 'dominado')
   const recipient = [...heroTopics]
@@ -373,3 +393,5 @@ export function CicloView({ lancamentos, onOpenMaterial, onConcluir }: Props) {
     </div>
   )
 }
+
+export const CicloView = memo(CicloViewInner)

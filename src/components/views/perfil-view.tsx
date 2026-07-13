@@ -1,5 +1,5 @@
 import { Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
@@ -11,7 +11,7 @@ type Props = {
   onReset: () => void
 }
 
-export function PerfilView({ lancamentos, onReset }: Props) {
+function PerfilViewInner({ lancamentos, onReset }: Props) {
   const { user, profile } = useAuth()
   const { theme, setTheme } = useTheme()
   const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
@@ -204,3 +204,5 @@ function Field({
     </div>
   )
 }
+
+export const PerfilView = memo(PerfilViewInner)

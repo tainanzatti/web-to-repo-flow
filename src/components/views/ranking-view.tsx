@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { memo, useEffect, useState } from 'react'
 import { Trophy, Percent, CalendarRange, Clock, ListChecks, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
@@ -22,7 +22,7 @@ const METRICS: { id: Metric; label: string; icon: typeof Trophy; format: (r: Ran
   { id: 'tempo', label: 'Tempo estudado', icon: Clock, format: (r) => `${Math.round(r.total_minutos / 60)}h`, sortKey: (r) => r.total_minutos },
 ]
 
-export function RankingView() {
+function RankingViewInner() {
   const { user } = useAuth()
   const [rows, setRows] = useState<RankingRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -139,3 +139,5 @@ export function RankingView() {
     </div>
   )
 }
+
+export const RankingView = memo(RankingViewInner)
