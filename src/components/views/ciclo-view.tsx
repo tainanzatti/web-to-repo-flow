@@ -393,3 +393,5 @@ function CicloViewInner({ lancamentos, onOpenMaterial, onConcluir }: Props) {
     </div>
   )
 }
+
+export const CicloView = memo(CicloViewInner)
