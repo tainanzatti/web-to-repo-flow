@@ -1,208 +1,178 @@
-import { Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor } from 'lucide-react'
-import { memo, useEffect, useState } from 'react'
-import { type Lancamento } from '@/lib/curriculum'
-import { SectionLabel } from '@/components/ui-bits'
-import { useAuth } from '@/lib/auth-context'
-import { useTheme, type ThemeMode } from '@/lib/theme-context'
-import { supabase } from '@/lib/supabase'
+import { useState, useEffect, useCallback } from "react";
+import { User, Award, Clock, CheckCircle, Calendar, Save } from "lucide-react";
+import {
+  fetchUserPrefs,
+  updateUserPrefs,
+  fetchLancamentos,
+  type UserPrefs,
+} from "../../lib/db";
 
-type Props = {
-  lancamentos: Lancamento[]
-  onReset: () => void
-}
+const PROVA_DATE = new Date("2026-12-06");
+const CONCURSO = "PMSC Soldado 2026";
+const BANCA = "Instituto AOCP";
 
-function PerfilViewInner({ lancamentos, onReset }: Props) {
-  const { user, profile } = useAuth()
-  const { theme, setTheme } = useTheme()
-  const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
-  const dias = new Set(lancamentos.map((l) => l.data)).size
+export default function PerfilView() {
+  const [prefs, setPrefs] = useState<UserPrefs | null>(null);
+  const [nome, setNome] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [stats, setStats] = useState({
+    horasTotal: 0,
+    questoesFeitas: 0,
+    aproveitamento: 0,
+  });
+  const [loading, setLoading] = useState(true);
 
-  const [fullName, setFullName] = useState('')
-  const [cpf, setCpf] = useState('')
-  const [phone, setPhone] = useState('')
-  const [dateOfBirth, setDateOfBirth] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [p, lancs] = await Promise.all([fetchUserPrefs(), fetchLancamentos()]);
+      setPrefs(p);
+      setNome(p.nome);
+      const horasTotal = lancs.reduce((s, l) => s + l.minutos, 0) / 60;
+      const aproveitamento =
+        lancs.length > 0 ? lancs.reduce((s, l) => s + l.mastery, 0) / lancs.length : 0;
+      setStats({ horasTotal, questoesFeitas: lancs.length, aproveitamento });
+    } catch (err) {
+      console.error("Erro ao carregar perfil:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!profile) return
-    setFullName(profile.full_name || '')
-    setCpf(profile.cpf || '')
-    setDateOfBirth(profile.date_of_birth || '')
-    // phone comes back on profile once schema is regenerated
-    setPhone(((profile as unknown as { phone?: string }).phone) || '')
-  }, [profile])
+    load();
+  }, [load]);
 
-  async function handleSave() {
-    if (!user) return
-    setSaving(true)
-    setSaved(false)
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName,
-        cpf: cpf || null,
-        date_of_birth: dateOfBirth || null,
-        phone: phone || null,
-      } as never)
-      .eq('id', user.id)
-    setSaving(false)
-    if (error) {
-      console.error('Erro ao salvar perfil:', error)
-      return
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      await updateUserPrefs({ nome });
+      setPrefs((p) => (p ? { ...p, nome } : p));
+    } catch (err) {
+      console.error("Erro ao salvar:", err);
+    } finally {
+      setSaving(false);
     }
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
+  };
+
+  const diasAteProva = Math.ceil((PROVA_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-ink-400 text-sm">Carregando perfil...</div>
+      </div>
+    );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        <div className="rounded-2xl border border-border-soft bg-card p-5">
-          <SectionLabel>ASSINATURA</SectionLabel>
-          <InfoRow label="Status" value="Ativa" valueColor="var(--success)" />
-          <InfoRow label="Tipo" value="Operação PMSC — Premium" />
-          <InfoRow label="Expiração" value="09/07/2026" />
-        </div>
-        <div className="rounded-2xl border border-primary/30 bg-card p-5">
-          <SectionLabel>PLANO SELECIONADO</SectionLabel>
-          <div className="flex items-center gap-2 rounded-lg border border-tier-mastered/40 bg-tier-mastered/10 px-3 py-3">
-            <Crown size={16} className="text-tier-good" />
-            <span className="font-display text-sm font-bold text-foreground">
-              [PMSC] Soldado 2026
-            </span>
-          </div>
-          <div className="mt-3 grid grid-cols-2 gap-3">
-            <MiniStat label="Questões resolvidas" value={totalQ} />
-            <MiniStat label="Dias ativos" value={dias} />
-          </div>
+    <div className="max-w-3xl mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-ink-900 flex items-center gap-2">
+          <User className="w-6 h-6 text-brand-600" /> Perfil do Candidato
+        </h1>
+      </div>
+
+      {/* Contest info — primary */}
+      <div className="card p-5 mb-6">
+        <h3 className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-4">
+          Concurso
+        </h3>
+        <div className="grid grid-cols-2 gap-4">
+          <InfoItem label="Concurso" value={CONCURSO} />
+          <InfoItem label="Banca" value={BANCA} />
+          <InfoItem
+            label="Dias até a prova"
+            value={`${diasAteProva} dias`}
+            highlight={diasAteProva < 100}
+            icon={Calendar}
+          />
+          <InfoItem label="Data da prova" value="06/12/2026" />
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border-soft bg-card p-5">
-        <SectionLabel>INFORMAÇÕES PESSOAIS</SectionLabel>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-          <Field label="Nome completo" value={fullName} onChange={setFullName} />
-          <Field label="Email" value={user?.email || ''} onChange={() => {}} disabled />
-          <Field label="CPF" value={cpf} onChange={setCpf} />
-          <Field label="Data de nascimento" value={dateOfBirth} onChange={setDateOfBirth} type="date" />
-          <Field label="Celular" value={phone} onChange={setPhone} />
-        </div>
-        <div className="mt-5 flex items-center justify-end gap-3">
-          {saved && (
-            <span className="flex items-center gap-1 text-xs text-[color:var(--success)]">
-              <Check size={14} /> Salvo
-            </span>
-          )}
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            className="flex items-center gap-2 rounded-lg bg-primary px-5 py-2 font-display text-sm font-bold text-primary-foreground transition hover:brightness-110 disabled:opacity-60"
-          >
-            {saving && <Loader2 size={14} className="animate-spin" />}
-            Salvar
-          </button>
+      {/* Study stats — primary */}
+      <div className="card p-5 mb-6">
+        <h3 className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-4">
+          Estatísticas de Estudo
+        </h3>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <StatItem icon={Clock} label="Horas estudadas" value={`${stats.horasTotal.toFixed(1)}h`} />
+          <StatItem icon={CheckCircle} label="Questões/Sessões" value={String(stats.questoesFeitas)} />
+          <StatItem icon={Award} label="Aproveitamento" value={`${Math.round(stats.aproveitamento)}%`} />
+          <StatItem icon={Calendar} label="Horas/dia meta" value={`${prefs?.horas_estudo_dia ?? 4}h`} />
         </div>
       </div>
 
-      <div className="rounded-2xl border border-border-soft bg-card p-5">
-        <SectionLabel>APARÊNCIA</SectionLabel>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="max-w-md text-[12px] leading-relaxed text-muted-foreground">
-            Escolha o tema da plataforma. A opção Automático segue a preferência do seu sistema
-            operacional. Sua escolha é salva na sua conta.
+      {/* Personal data — secondary */}
+      <div className="card p-5">
+        <h3 className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-4">
+          Dados Pessoais
+        </h3>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-ink-700 block mb-1.5">
+              Nome
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                className="flex-1 rounded-xl border border-ink-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
+                placeholder="Seu nome"
+              />
+              <button onClick={handleSave} disabled={saving} className="btn-primary">
+                <Save className="w-4 h-4" /> Salvar
+              </button>
+            </div>
+          </div>
+          <p className="text-xs text-ink-400">
+            Os dados pessoais (CPF, telefone, etc.) não são necessários para o estudo.
+            Mantenha o foco no que importa para o concurso.
           </p>
-          <div className="flex gap-2">
-            {([
-              { id: 'light', label: 'Claro', Icon: Sun },
-              { id: 'dark', label: 'Escuro', Icon: Moon },
-              { id: 'auto', label: 'Auto', Icon: Monitor },
-            ] as { id: ThemeMode; label: string; Icon: typeof Sun }[]).map(({ id, label, Icon }) => {
-              const active = theme === id
-              return (
-                <button
-                  key={id}
-                  onClick={() => setTheme(id)}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition ${
-                    active
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-border-soft bg-card text-muted-foreground hover:border-primary/40 hover:text-foreground'
-                  }`}
-                >
-                  <Icon size={14} />
-                  {label}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="rounded-2xl border border-border-soft bg-card p-5">
-        <SectionLabel>DADOS DO APLICATIVO</SectionLabel>
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <p className="max-w-md text-[12px] leading-relaxed text-muted-foreground">
-            Todo o seu histórico de estudos fica salvo na sua conta. Reiniciar apaga permanentemente
-            todos os seus lançamentos — a conta volta ao estado inicial (zero questões, zero
-            progresso).
-          </p>
-          <button
-            onClick={onReset}
-            className="flex items-center gap-2 rounded-lg border border-primary/50 px-4 py-2 text-sm font-medium text-primary transition hover:bg-primary/10"
-          >
-            <RotateCcw size={14} /> Reiniciar dados
-          </button>
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-function InfoRow({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-border-soft/60 py-2.5 last:border-0">
-      <span className="text-[11px] uppercase tracking-wider text-faint">{label}</span>
-      <span className="text-sm font-semibold" style={{ color: valueColor || 'var(--foreground)' }}>
-        {value}
-      </span>
-    </div>
-  )
-}
-
-function MiniStat({ label, value }: { label: string; value: number }) {
-  return (
-    <div className="rounded-lg border border-border-soft bg-secondary p-3">
-      <div className="font-mono text-xl font-bold text-foreground">{value}</div>
-      <div className="text-[10px] text-faint">{label}</div>
-    </div>
-  )
-}
-
-function Field({
+function InfoItem({
   label,
   value,
-  onChange,
-  disabled,
-  type = 'text',
+  highlight,
+  icon: Icon,
 }: {
-  label: string
-  value: string
-  onChange: (v: string) => void
-  disabled?: boolean
-  type?: string
+  label: string;
+  value: string;
+  highlight?: boolean;
+  icon?: typeof Calendar;
 }) {
   return (
     <div>
-      <label className="mb-1 block text-[11px] font-medium text-muted-foreground">{label}</label>
-      <input
-        type={type}
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.value)}
-        className="input-base disabled:opacity-60"
-      />
+      <p className="text-xs text-ink-500">{label}</p>
+      <p className={`text-sm font-semibold mt-0.5 flex items-center gap-1.5 ${highlight ? "text-warning-600" : "text-ink-900"}`}>
+        {Icon && <Icon className="w-4 h-4" />}
+        {value}
+      </p>
     </div>
-  )
+  );
 }
 
-export const PerfilView = memo(PerfilViewInner)
+function StatItem({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: typeof Clock;
+  label: string;
+  value: string;
+}) {
+  return (
+    <div className="p-3 rounded-xl bg-ink-50">
+      <Icon className="w-4 h-4 text-ink-400 mb-2" />
+      <p className="text-lg font-bold text-ink-900">{value}</p>
+      <p className="text-xs text-ink-500">{label}</p>
+    </div>
+  );
+}

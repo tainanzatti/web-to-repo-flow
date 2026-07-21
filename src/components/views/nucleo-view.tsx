@@ -1,147 +1,337 @@
-import { memo, useState } from 'react'
-import { RefreshCw, FileText, Lock, Repeat } from 'lucide-react'
+import { useState, useEffect, useCallback } from "react";
 import {
-  CURRICULUM,
-  ROTATION_ORDER,
-  targetViews,
-  viewCount,
-  lerpColor,
-  movingAverageMastery,
-  type Lancamento,
-} from '@/lib/curriculum'
-import { IconTip } from '@/components/ui-bits'
+  Lock,
+  ChevronDown,
+  ChevronRight,
+  Play,
+  SkipForward,
+  AlertTriangle,
+  Clock,
+  BookOpen,
+  Sparkles,
+} from "lucide-react";
+import {
+  fetchDisciplines,
+  fetchTopics,
+  fetchLancamentos,
+  fetchSkipCounts,
+  incrementSkip,
+  resetSkip,
+  insertLancamento,
+} from "../../lib/db";
+import {
+  computeDisciplinaData,
+  nextHeroDiscipline,
+  allocateTopics,
+  tierFromMastery,
+  type DisciplinaComTopicos,
+  type DisciplinaScore,
+  type AllocatedTopic,
+} from "../../lib/curriculum";
 
-type Props = {
-  lancamentos: Lancamento[]
-  onOpenMaterial: (discId: string, topicId: string) => void
-}
+const TIER_COLORS: Record<string, string> = {
+  ruim: "bg-error-500",
+  medio: "bg-warning-500",
+  bom: "bg-brand-500",
+  otimo: "bg-success-500",
+  dominado: "bg-success-700",
+};
 
-// Cor fria (poucas revisões) -> quente (meta atingida): azul -> verde
-function reviewColor(count: number, target: number): string {
-  const t = Math.min(1, count / target)
-  return lerpColor('#3b6fb5', '#2f9e5f', t)
-}
+const TIER_LABELS: Record<string, string> = {
+  ruim: "Ruim",
+  medio: "Médio",
+  bom: "Bom",
+  otimo: "Ótimo",
+  dominado: "Dominado",
+};
 
-function NucleoViewInner({ lancamentos, onOpenMaterial }: Props) {
-  return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-4 rounded-xl border border-border-soft bg-card px-4 py-3">
-        <span className="font-mono text-[10px] uppercase tracking-wider text-faint">
-          Progresso de revisão
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="h-3 w-16 rounded-sm bg-gradient-to-r from-[#3b6fb5] to-[#2f9e5f]" />
-          <span className="text-[11px] text-muted-foreground">poucas → meta atingida</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-[11px] text-faint">
-          <Lock size={11} /> tópico ainda não iniciado
-        </div>
+export default function NucleoView() {
+  const [disciplinas, setDisciplinas] = useState<DisciplinaComTopicos[]>([]);
+  const [heroScore, setHeroScore] = useState<DisciplinaScore | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [skipConfirm, setSkipConfirm] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [estudando, setEstudando] = useState<AllocatedTopic[] | null>(null);
+
+  const loadData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [discs, tops, lancs, skipMap] = await Promise.all([
+        fetchDisciplines(),
+        fetchTopics(),
+        fetchLancamentos(),
+        fetchSkipCounts(),
+      ]);
+
+      const discData = discs.map((d) => {
+        const topicsForDisc = tops.filter((t) => t.disciplina_id === d.id);
+        return computeDisciplinaData(d, topicsForDisc, lancs);
+      });
+
+      setDisciplinas(discData);
+      const hero = nextHeroDiscipline(discData, skipMap);
+      setHeroScore(hero);
+      if (hero) setExpandedId(hero.disciplinaId);
+    } catch (err) {
+      console.error("Erro ao carregar núcleo:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  const handleSkip = async (disciplinaId: string) => {
+    await incrementSkip(disciplinaId);
+    setSkipConfirm(null);
+    await loadData();
+  };
+
+  const handleEstudar = async (d: DisciplinaComTopicos) => {
+    const allocated = allocateTopics(d, 45);
+    setEstudando(allocated);
+  };
+
+  const handleRegistrarTopico = async (alloc: AllocatedTopic) => {
+    await insertLancamento({
+      disciplina_id: alloc.topic.disciplina_id,
+      topico_id: alloc.topic.id,
+      mastery: Math.min(100, alloc.topic.movingAverageMastery + 15),
+      minutos: alloc.minutos,
+      is_primeiro_contato: alloc.topic.isPrimeiroContato,
+    });
+  };
+
+  const handleConcluirSessao = async () => {
+    if (!estudando) return;
+    const discId = estudando[0].topic.disciplina_id;
+    for (const alloc of estudando) {
+      await handleRegistrarTopico(alloc);
+    }
+    await resetSkip(discId);
+    setEstudando(null);
+    await loadData();
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <div className="text-ink-400 text-sm">Carregando núcleo...</div>
       </div>
+    );
+  }
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-        {ROTATION_ORDER.map((discId) => (
-          <DisciplineColumn
-            key={discId}
-            discId={discId}
-            lancamentos={lancamentos}
-            onOpenMaterial={onOpenMaterial}
-          />
-        ))}
-      </div>
-    </div>
-  )
-}
-
-function DisciplineColumn({
-  discId,
-  lancamentos,
-  onOpenMaterial,
-}: {
-  discId: string
-  lancamentos: Lancamento[]
-  onOpenMaterial: (discId: string, topicId: string) => void
-}) {
-  const [open, setOpen] = useState(true)
-  const disc = CURRICULUM[discId]
-
-  return (
-    <div className="w-full min-w-0">
-
-      <div className="mb-3 flex items-center justify-between rounded-lg border border-border-soft bg-card-raised px-3 py-2.5">
-        <span className="font-display text-sm font-bold text-foreground">{disc.name}</span>
-        <IconTip label={open ? 'Recolher tópicos' : 'Expandir tópicos'} side="left">
-          <button
-            onClick={() => setOpen((o) => !o)}
-            aria-label={open ? 'Recolher' : 'Expandir'}
-            className="text-faint transition hover:text-foreground"
-          >
-            <RefreshCw size={13} className={open ? '' : 'opacity-40'} />
-          </button>
-        </IconTip>
-      </div>
-      {open && (
-        <div className="space-y-2.5">
-          {disc.topics.map((t) => {
-            const count = viewCount(lancamentos, discId, t.id)
-            const target = targetViews(t.fib)
-            const mastery = movingAverageMastery(lancamentos, discId, t.id)
-            const started = count > 0
-            const color = reviewColor(count, target)
-            return (
-              <div
-                key={t.id}
-                className="rounded-lg border border-border-soft bg-card p-3 transition hover:border-border"
-              >
-                <div className="mb-2.5 flex items-start gap-2">
-                  <span
-                    className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
-                    style={{
-                      background: started ? color : 'transparent',
-                      border: started ? 'none' : '1.5px solid var(--faint)',
-                    }}
-                  />
-                  <span className="text-[13px] font-medium leading-snug text-foreground text-pretty">
-                    {t.name}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className="flex items-center gap-1 font-mono text-[11px] text-muted-foreground">
-                      <Repeat size={11} />
-                      {count}
-                      <span className="text-faint">/{target}</span>
-                    </span>
-                    {started ? (
-                      <span className="font-mono text-[11px]" style={{ color }}>
-                        {mastery}%
+  if (estudando) {
+    return (
+      <div className="max-w-2xl mx-auto p-6 animate-fadeIn">
+        <h2 className="text-xl font-bold text-ink-900 mb-1">Sessão de Estudo</h2>
+        <p className="text-sm text-ink-500 mb-6">
+          {estudando.length} tópico(s) — conclua cada um para registrar o progresso
+        </p>
+        <div className="space-y-3">
+          {estudando.map((alloc, i) => (
+            <div key={alloc.topic.id} className="card p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-ink-400">#{i + 1}</span>
+                    {alloc.isManutencao && (
+                      <span className="text-xs bg-warning-100 text-warning-700 px-2 py-0.5 rounded-full font-semibold">
+                        Manutenção
                       </span>
-                    ) : (
-                      <Lock size={11} className="text-faint" />
                     )}
                   </div>
-                  <IconTip label="Abrir materiais deste tópico" side="left">
-                    <button
-                      onClick={() => onOpenMaterial(discId, t.id)}
-                      aria-label="Material de estudo"
-                      className="rounded p-1 text-primary transition hover:scale-125"
-                    >
-                      <FileText size={13} />
-                    </button>
-                  </IconTip>
-                </div>
-                <div className="mt-2 h-1 overflow-hidden rounded-full bg-card-raised">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${Math.min(100, (count / target) * 100)}%`, background: color }}
-                  />
+                  <h3 className="font-semibold text-ink-900">{alloc.topic.nome}</h3>
+                  <div className="flex items-center gap-3 mt-1 text-xs text-ink-500">
+                    <span className="flex items-center gap-1">
+                      <Clock className="w-3.5 h-3.5" /> {alloc.minutos} min
+                    </span>
+                    <span>
+                      Domínio atual: {Math.round(alloc.topic.movingAverageMastery)}% (
+                      {TIER_LABELS[alloc.topic.tier]})
+                    </span>
+                  </div>
                 </div>
               </div>
-            )
-          })}
+            </div>
+          ))}
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button onClick={handleConcluirSessao} className="btn-primary flex-1">
+            Concluir e Registrar
+          </button>
+          <button onClick={() => setEstudando(null)} className="btn-secondary">
+            Cancelar
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto p-6">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-ink-900">Núcleo de Estudos</h1>
+        <p className="text-sm text-ink-500 mt-1">
+          A disciplina ativa é definida pelo seu score de prioridade. As demais ficam
+          bloqueadas até serem ativadas.
+        </p>
+      </div>
+
+      {heroScore && (
+        <div className="card p-4 mb-6 bg-brand-50 border-brand-200">
+          <div className="flex items-center gap-2 text-brand-800">
+            <Sparkles className="w-5 h-5" />
+            <span className="font-semibold text-sm">
+              Disciplina ativa: {heroScore.nome}
+            </span>
+          </div>
+          <p className="text-sm text-ink-600 mt-1.5">{heroScore.motivoPrioridade}</p>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {disciplinas.map((d) => {
+          const isActive = heroScore?.disciplinaId === d.disciplina.id;
+          const isExpanded = expandedId === d.disciplina.id;
+          const isRedacao = d.disciplina.is_redacao;
+
+          return (
+            <div
+              key={d.disciplina.id}
+              className={`card overflow-hidden transition-all ${
+                isActive ? "ring-2 ring-brand-500" : "opacity-70"
+              } ${isRedacao ? "border-l-4 border-l-warning-500" : ""}`}
+            >
+              {/* Card header */}
+              <div
+                className={`p-4 ${isActive ? "cursor-pointer hover:bg-ink-50" : ""}`}
+                onClick={() => isActive && setExpandedId(isExpanded ? null : d.disciplina.id)}
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    {!isActive ? (
+                      <Lock className="w-4 h-4 text-ink-400" />
+                    ) : isExpanded ? (
+                      <ChevronDown className="w-4 h-4 text-brand-600" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-brand-600" />
+                    )}
+                    <h3 className={`font-semibold text-sm ${isActive ? "text-ink-900" : "text-ink-500"}`}>
+                      {d.disciplina.nome}
+                    </h3>
+                  </div>
+                  {isRedacao && (
+                    <span className="text-xs bg-warning-100 text-warning-700 px-2 py-0.5 rounded-full font-semibold">
+                      Redação
+                    </span>
+                  )}
+                </div>
+
+                {/* Mastery bar */}
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-xs text-ink-500">
+                    <span>Domínio</span>
+                    <span className="font-semibold">{Math.round(d.dominioMedio)}%</span>
+                  </div>
+                  <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        d.dominioMedio >= 80 ? "bg-success-500" : d.dominioMedio >= 60 ? "bg-brand-500" : d.dominioMedio >= 40 ? "bg-warning-500" : "bg-error-500"
+                      }`}
+                      style={{ width: `${Math.min(100, d.dominioMedio)}%` }}
+                    />
+                  </div>
+                </div>
+
+                {/* Days since review */}
+                <div className="flex items-center gap-1.5 mt-2 text-xs text-ink-400">
+                  <Clock className="w-3.5 h-3.5" />
+                  <span>
+                    {d.diasDesdeUltimaRevisao >= 9999
+                      ? "Nunca revisada"
+                      : `Há ${d.diasDesdeUltimaRevisao} dias sem revisão`}
+                  </span>
+                </div>
+              </div>
+
+              {/* Expanded content */}
+              {isActive && isExpanded && (
+                <div className="px-4 pb-4 border-t border-ink-100 animate-fadeIn">
+                  {heroScore && (
+                    <div className="mt-3 mb-3 p-3 bg-ink-50 rounded-xl">
+                      <p className="text-xs text-ink-600 font-medium">
+                        {heroScore.motivoPrioridade}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Topics list */}
+                  <div className="space-y-2 mb-4">
+                    <h4 className="text-xs font-semibold text-ink-500 uppercase tracking-wide">
+                      Tópicos
+                    </h4>
+                    {d.topicos.map((t) => (
+                      <div key={t.id} className="flex items-center justify-between gap-2">
+                        <span className="text-sm text-ink-700 truncate">{t.nome}</span>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className="text-xs text-ink-500">{Math.round(t.movingAverageMastery)}%</span>
+                          <div className={`w-2 h-2 rounded-full ${TIER_COLORS[t.tier]}`} />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => handleEstudar(d)}
+                      className="btn-primary flex-1"
+                    >
+                      <Play className="w-4 h-4" /> Estudar
+                    </button>
+                    <button
+                      onClick={() => setSkipConfirm(d.disciplina.id)}
+                      className="btn-ghost"
+                      title="Pular esta disciplina"
+                    >
+                      <SkipForward className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Skip confirmation modal */}
+      {skipConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
+          <div className="card p-6 max-w-md w-full">
+            <div className="flex items-center gap-3 mb-3">
+              <AlertTriangle className="w-6 h-6 text-warning-500" />
+              <h3 className="text-lg font-bold text-ink-900">Pular disciplina?</h3>
+            </div>
+            <p className="text-sm text-ink-600 mb-5">
+              Pular não te livra dela — ela volta com prioridade maior e fica registrado.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => handleSkip(skipConfirm)}
+                className="btn-danger flex-1"
+              >
+                Sim, pular
+              </button>
+              <button onClick={() => setSkipConfirm(null)} className="btn-secondary">
+                Cancelar
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
-  )
+  );
 }
-
-export const NucleoView = memo(NucleoViewInner)
