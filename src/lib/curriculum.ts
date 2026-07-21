@@ -138,7 +138,9 @@ export function computeDisciplinaData(
   const diasDesdeUltimaRevisao =
     discLanc.length > 0 ? diasDesde(discLanc[0].criado_em) : 9999;
 
-  const topicosAbaixoBom = topicos.filter((t) => t.tier !== "bom" && t.tier !== "otimo" && t.tier !== "dominado").length;
+  const topicosAbaixoBom = topicos.filter(
+    (t) => t.tier !== "bom" && t.tier !== "otimo" && t.tier !== "dominado"
+  ).length;
 
   return { disciplina, topicos, dominioMedio, diasDesdeUltimaRevisao, topicosAbaixoBom };
 }
@@ -151,18 +153,21 @@ export function computeScore(
   vezesPulada: number = 0
 ): DisciplinaScore {
   const pesoNormalizado = disciplina.peso_edital / 5;
-  const fator = fatorEsquecimento(diasDesdeUltimaRevisao);
+  const dias = diasDesdeUltimaRevisao >= 9999 ? 0 : diasDesdeUltimaRevisao;
+  const fator = fatorEsquecimento(dias);
   const score =
     pesoNormalizado * (1 - dominioMedio / 100) * fator * multiplicadorUrgencia;
 
-  const motivo = `peso ${disciplina.peso_edital} no edital, domínio médio ${Math.round(dominioMedio)}%, sem revisão há ${diasDesdeUltimaRevisao >= 9999 ? "nunca" : diasDesdeUltimaRevisao + " dias"}`;
+  const motivo = `peso ${disciplina.peso_edital} no edital, domínio médio ${Math.round(dominioMedio)}%, sem revisão há ${
+    diasDesdeUltimaRevisao >= 9999 ? "nunca" : diasDesdeUltimaRevisao + " dias"
+  }${vezesPulada > 0 ? `, pulada ${vezesPulada}x` : ""}`;
 
   return {
     disciplinaId: disciplina.id,
     nome: disciplina.nome,
     pesoEdital: disciplina.peso_edital,
     dominioMedio,
-    diasDesdeUltimaRevisao: diasDesdeUltimaRevisao >= 9999 ? 0 : diasDesdeUltimaRevisao,
+    diasDesdeUltimaRevisao: dias,
     fatorEsquecimento: fator,
     multiplicadorUrgencia,
     vezesPulada,
@@ -171,13 +176,26 @@ export function computeScore(
   };
 }
 
+/**
+ * Returns the discipline with the highest priority score.
+ * When `excludeDisciplinaId` is provided, that discipline is removed
+ * from the candidate pool entirely — used when the user skips a
+ * discipline, so the next one becomes active instead of staying stuck.
+ */
 export function nextHeroDiscipline(
   disciplinas: DisciplinaComTopicos[],
-  skipData: Map<DisciplineId, { vezes_pulada: number; multiplicador_urgencia: number }>
+  skipData: Map<DisciplineId, { vezes_pulada: number; multiplicador_urgencia: number }>,
+  excludeDisciplinaId?: DisciplineId | null
 ): DisciplinaScore | null {
   if (disciplinas.length === 0) return null;
 
-  const scores = disciplinas.map((d) => {
+  const candidates = excludeDisciplinaId
+    ? disciplinas.filter((d) => d.disciplina.id !== excludeDisciplinaId)
+    : disciplinas;
+
+  if (candidates.length === 0) return null;
+
+  const scores = candidates.map((d) => {
     const skip = skipData.get(d.disciplina.id);
     const mult = skip?.multiplicador_urgencia ?? 1;
     const vezes = skip?.vezes_pulada ?? 0;
@@ -218,15 +236,23 @@ export function allocateTopics(
     )
     .sort((a, b) => (b.ultimoContatoDias ?? 0) - (a.ultimoContatoDias ?? 0));
 
-  const slotsPrincipais = Math.max(1, tecto - (dominadosParaRessurgir.length > 0 ? 1 : 0));
+  const slotsPrincipais = Math.max(
+    1,
+    tecto - (dominadosParaRessurgir.length > 0 ? 1 : 0)
+  );
   const principais = naoDominados.slice(0, slotsPrincipais);
   const manutencao = dominadosParaRessurgir.slice(0, 1);
 
   const minutosManutencao = manutencao.length * MINUTOS_MANUTENCAO;
   const minutosDisponiveis = Math.max(0, minutosTotal - minutosManutencao);
+  const minutosPorTopico =
+    principais.length > 0 ? Math.floor(minutosDisponiveis / principais.length) : 0;
+
   const allocated: AllocatedTopic[] = principais.map((t) => ({
     topic: t,
-    minutos: t.isPrimeiroContato ? MINUTOS_POR_TOPICO_NOVO : MINUTOS_POR_TOPICO_REVISAO,
+    minutos: t.isPrimeiroContato
+      ? MINUTOS_POR_TOPICO_NOVO
+      : MINUTOS_POR_TOPICO_REVISAO,
     isManutencao: false,
   }));
 
@@ -237,12 +263,18 @@ export function allocateTopics(
   return allocated;
 }
 
-export function topicosParaFlashcards(disciplinas: DisciplinaComTopicos[]): { topicoId: string; disciplinaId: string; topicoNome: string }[] {
+export function topicosParaFlashcards(
+  disciplinas: DisciplinaComTopicos[]
+): { topicoId: string; disciplinaId: string; topicoNome: string }[] {
   const result: { topicoId: string; disciplinaId: string; topicoNome: string }[] = [];
   for (const d of disciplinas) {
     for (const t of d.topicos) {
       if (t.movingAverageMastery < TIER_THRESHOLDS.bom) {
-        result.push({ topicoId: t.id, disciplinaId: d.disciplina.id, topicoNome: t.nome });
+        result.push({
+          topicoId: t.id,
+          disciplinaId: d.disciplina.id,
+          topicoNome: t.nome,
+        });
       }
     }
   }

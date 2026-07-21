@@ -1,5 +1,15 @@
-import { callAI, type AIKind, type FlashcardPair, type RedacaoCorrecaoResult } from "./ai-client";
-import { fetchAiMaterial, upsertAiMaterial, insertFlashcards, deleteFlashcardsByTopico } from "./db";
+import {
+  callAI,
+  type AIKind,
+  type FlashcardPair,
+  type RedacaoCorrecaoResult,
+} from "./ai-client";
+import {
+  fetchAiMaterial,
+  upsertAiMaterial,
+  insertFlashcards,
+  deleteFlashcardsByTopico,
+} from "./db";
 
 export type { AIKind, FlashcardPair, RedacaoCorrecaoResult };
 
@@ -10,7 +20,9 @@ interface TopicContext {
   disciplinaNome: string;
 }
 
-export async function fetchOrGenerateFlashcards(ctx: TopicContext): Promise<FlashcardPair[]> {
+export async function fetchOrGenerateFlashcards(
+  ctx: TopicContext
+): Promise<FlashcardPair[]> {
   const cached = await fetchAiMaterial(ctx.topicoId, "flashcards");
   if (cached?.content_json?.flashcards) {
     return cached.content_json.flashcards as FlashcardPair[];
@@ -21,11 +33,18 @@ export async function fetchOrGenerateFlashcards(ctx: TopicContext): Promise<Flas
     disciplinaNome: ctx.disciplinaNome,
   });
 
-  await upsertAiMaterial(ctx.disciplinaId, ctx.topicoId, "flashcards", result as Record<string, unknown>);
+  await upsertAiMaterial(
+    ctx.disciplinaId,
+    ctx.topicoId,
+    "flashcards",
+    result as Record<string, unknown>
+  );
   return result.flashcards;
 }
 
-export async function ensureFlashcardsForTopic(ctx: TopicContext): Promise<void> {
+export async function ensureFlashcardsForTopic(
+  ctx: TopicContext
+): Promise<void> {
   const pairs = await fetchOrGenerateFlashcards(ctx);
   await deleteFlashcardsByTopico(ctx.topicoId);
   await insertFlashcards(
@@ -38,18 +57,31 @@ export async function ensureFlashcardsForTopic(ctx: TopicContext): Promise<void>
   );
 }
 
-export async function generateRedacaoTema(): Promise<{ tema: string; proposta: string }> {
+export async function generateRedacaoTema(): Promise<{
+  tema: string;
+  proposta: string;
+}> {
   const cached = await fetchAiMaterial("redacao", "redacao-tema");
   if (cached?.content_json?.tema) {
     return cached.content_json as { tema: string; proposta: string };
   }
 
-  const result = await callAI<{ tema: string; proposta: string }>("redacao-tema", {});
-  await upsertAiMaterial("redacao", "redacao", "redacao-tema", result as Record<string, unknown>);
+  const result = await callAI<{ tema: string; proposta: string }>(
+    "redacao-tema",
+    {}
+  );
+  await upsertAiMaterial(
+    "redacao",
+    "redacao",
+    "redacao-tema",
+    result as Record<string, unknown>
+  );
   return result;
 }
 
-export async function corrigirRedacao(texto: string): Promise<RedacaoCorrecaoResult> {
+export async function corrigirRedacao(
+  texto: string
+): Promise<RedacaoCorrecaoResult> {
   const result = await callAI<RedacaoCorrecaoResult>("redacao-correcao", {
     textoRedacao: texto,
   });

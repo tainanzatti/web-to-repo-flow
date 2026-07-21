@@ -7,7 +7,6 @@ import {
   SkipForward,
   AlertTriangle,
   Clock,
-  BookOpen,
   Sparkles,
 } from "lucide-react";
 import {
@@ -23,7 +22,6 @@ import {
   computeDisciplinaData,
   nextHeroDiscipline,
   allocateTopics,
-  tierFromMastery,
   type DisciplinaComTopicos,
   type DisciplinaScore,
   type AllocatedTopic,
@@ -52,8 +50,9 @@ export default function NucleoView() {
   const [skipConfirm, setSkipConfirm] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [estudando, setEstudando] = useState<AllocatedTopic[] | null>(null);
+  const [skipping, setSkipping] = useState(false);
 
-  const loadData = useCallback(async () => {
+  const loadData = useCallback(async (excludeId?: string | null) => {
     setLoading(true);
     try {
       const [discs, tops, lancs, skipMap] = await Promise.all([
@@ -69,7 +68,7 @@ export default function NucleoView() {
       });
 
       setDisciplinas(discData);
-      const hero = nextHeroDiscipline(discData, skipMap);
+      const hero = nextHeroDiscipline(discData, skipMap, excludeId ?? null);
       setHeroScore(hero);
       if (hero) setExpandedId(hero.disciplinaId);
     } catch (err) {
@@ -84,9 +83,17 @@ export default function NucleoView() {
   }, [loadData]);
 
   const handleSkip = async (disciplinaId: string) => {
-    await incrementSkip(disciplinaId);
-    setSkipConfirm(null);
-    await loadData();
+    setSkipping(true);
+    try {
+      await incrementSkip(disciplinaId);
+      setSkipConfirm(null);
+      // Reload data excluding the skipped discipline so a new one becomes active
+      await loadData(disciplinaId);
+    } catch (err) {
+      console.error("Erro ao pular:", err);
+    } finally {
+      setSkipping(false);
+    }
   };
 
   const handleEstudar = async (d: DisciplinaComTopicos) => {
@@ -136,20 +143,25 @@ export default function NucleoView() {
               <div className="flex items-start justify-between gap-3">
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-ink-400">#{i + 1}</span>
+                    <span className="text-xs font-bold text-ink-400">
+                      #{i + 1}
+                    </span>
                     {alloc.isManutencao && (
                       <span className="text-xs bg-warning-100 text-warning-700 px-2 py-0.5 rounded-full font-semibold">
                         Manutenção
                       </span>
                     )}
                   </div>
-                  <h3 className="font-semibold text-ink-900">{alloc.topic.nome}</h3>
+                  <h3 className="font-semibold text-ink-900">
+                    {alloc.topic.nome}
+                  </h3>
                   <div className="flex items-center gap-3 mt-1 text-xs text-ink-500">
                     <span className="flex items-center gap-1">
                       <Clock className="w-3.5 h-3.5" /> {alloc.minutos} min
                     </span>
                     <span>
-                      Domínio atual: {Math.round(alloc.topic.movingAverageMastery)}% (
+                      Domínio atual:{" "}
+                      {Math.round(alloc.topic.movingAverageMastery)}% (
                       {TIER_LABELS[alloc.topic.tier]})
                     </span>
                   </div>
@@ -159,7 +171,10 @@ export default function NucleoView() {
           ))}
         </div>
         <div className="flex gap-3 mt-6">
-          <button onClick={handleConcluirSessao} className="btn-primary flex-1">
+          <button
+            onClick={handleConcluirSessao}
+            className="btn-primary flex-1"
+          >
             Concluir e Registrar
           </button>
           <button onClick={() => setEstudando(null)} className="btn-secondary">
@@ -175,8 +190,8 @@ export default function NucleoView() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-ink-900">Núcleo de Estudos</h1>
         <p className="text-sm text-ink-500 mt-1">
-          A disciplina ativa é definida pelo seu score de prioridade. As demais ficam
-          bloqueadas até serem ativadas.
+          A disciplina ativa é definida pelo seu score de prioridade. As demais
+          ficam bloqueadas até serem ativadas.
         </p>
       </div>
 
@@ -188,7 +203,9 @@ export default function NucleoView() {
               Disciplina ativa: {heroScore.nome}
             </span>
           </div>
-          <p className="text-sm text-ink-600 mt-1.5">{heroScore.motivoPrioridade}</p>
+          <p className="text-sm text-ink-600 mt-1.5">
+            {heroScore.motivoPrioridade}
+          </p>
         </div>
       )}
 
@@ -205,10 +222,14 @@ export default function NucleoView() {
                 isActive ? "ring-2 ring-brand-500" : "opacity-70"
               } ${isRedacao ? "border-l-4 border-l-warning-500" : ""}`}
             >
-              {/* Card header */}
               <div
-                className={`p-4 ${isActive ? "cursor-pointer hover:bg-ink-50" : ""}`}
-                onClick={() => isActive && setExpandedId(isExpanded ? null : d.disciplina.id)}
+                className={`p-4 ${
+                  isActive ? "cursor-pointer hover:bg-ink-50" : ""
+                }`}
+                onClick={() =>
+                  isActive &&
+                  setExpandedId(isExpanded ? null : d.disciplina.id)
+                }
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -219,7 +240,11 @@ export default function NucleoView() {
                     ) : (
                       <ChevronRight className="w-4 h-4 text-brand-600" />
                     )}
-                    <h3 className={`font-semibold text-sm ${isActive ? "text-ink-900" : "text-ink-500"}`}>
+                    <h3
+                      className={`font-semibold text-sm ${
+                        isActive ? "text-ink-900" : "text-ink-500"
+                      }`}
+                    >
                       {d.disciplina.nome}
                     </h3>
                   </div>
@@ -230,23 +255,31 @@ export default function NucleoView() {
                   )}
                 </div>
 
-                {/* Mastery bar */}
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-xs text-ink-500">
                     <span>Domínio</span>
-                    <span className="font-semibold">{Math.round(d.dominioMedio)}%</span>
+                    <span className="font-semibold">
+                      {Math.round(d.dominioMedio)}%
+                    </span>
                   </div>
                   <div className="h-2 bg-ink-100 rounded-full overflow-hidden">
                     <div
                       className={`h-full rounded-full transition-all ${
-                        d.dominioMedio >= 80 ? "bg-success-500" : d.dominioMedio >= 60 ? "bg-brand-500" : d.dominioMedio >= 40 ? "bg-warning-500" : "bg-error-500"
+                        d.dominioMedio >= 80
+                          ? "bg-success-500"
+                          : d.dominioMedio >= 60
+                          ? "bg-brand-500"
+                          : d.dominioMedio >= 40
+                          ? "bg-warning-500"
+                          : "bg-error-500"
                       }`}
-                      style={{ width: `${Math.min(100, d.dominioMedio)}%` }}
+                      style={{
+                        width: `${Math.min(100, d.dominioMedio)}%`,
+                      }}
                     />
                   </div>
                 </div>
 
-                {/* Days since review */}
                 <div className="flex items-center gap-1.5 mt-2 text-xs text-ink-400">
                   <Clock className="w-3.5 h-3.5" />
                   <span>
@@ -257,7 +290,6 @@ export default function NucleoView() {
                 </div>
               </div>
 
-              {/* Expanded content */}
               {isActive && isExpanded && (
                 <div className="px-4 pb-4 border-t border-ink-100 animate-fadeIn">
                   {heroScore && (
@@ -268,23 +300,30 @@ export default function NucleoView() {
                     </div>
                   )}
 
-                  {/* Topics list */}
                   <div className="space-y-2 mb-4">
                     <h4 className="text-xs font-semibold text-ink-500 uppercase tracking-wide">
                       Tópicos
                     </h4>
                     {d.topicos.map((t) => (
-                      <div key={t.id} className="flex items-center justify-between gap-2">
-                        <span className="text-sm text-ink-700 truncate">{t.nome}</span>
+                      <div
+                        key={t.id}
+                        className="flex items-center justify-between gap-2"
+                      >
+                        <span className="text-sm text-ink-700 truncate">
+                          {t.nome}
+                        </span>
                         <div className="flex items-center gap-2 shrink-0">
-                          <span className="text-xs text-ink-500">{Math.round(t.movingAverageMastery)}%</span>
-                          <div className={`w-2 h-2 rounded-full ${TIER_COLORS[t.tier]}`} />
+                          <span className="text-xs text-ink-500">
+                            {Math.round(t.movingAverageMastery)}%
+                          </span>
+                          <div
+                            className={`w-2 h-2 rounded-full ${TIER_COLORS[t.tier]}`}
+                          />
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  {/* Actions */}
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleEstudar(d)}
@@ -307,25 +346,31 @@ export default function NucleoView() {
         })}
       </div>
 
-      {/* Skip confirmation modal */}
       {skipConfirm && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 animate-fadeIn">
           <div className="card p-6 max-w-md w-full">
             <div className="flex items-center gap-3 mb-3">
               <AlertTriangle className="w-6 h-6 text-warning-500" />
-              <h3 className="text-lg font-bold text-ink-900">Pular disciplina?</h3>
+              <h3 className="text-lg font-bold text-ink-900">
+                Pular disciplina?
+              </h3>
             </div>
             <p className="text-sm text-ink-600 mb-5">
-              Pular não te livra dela — ela volta com prioridade maior e fica registrado.
+              Pular não te livra dela — ela volta com prioridade maior e fica
+              registrado.
             </p>
             <div className="flex gap-3">
               <button
                 onClick={() => handleSkip(skipConfirm)}
+                disabled={skipping}
                 className="btn-danger flex-1"
               >
-                Sim, pular
+                {skipping ? "Pulando..." : "Sim, pular"}
               </button>
-              <button onClick={() => setSkipConfirm(null)} className="btn-secondary">
+              <button
+                onClick={() => setSkipConfirm(null)}
+                className="btn-secondary"
+              >
                 Cancelar
               </button>
             </div>

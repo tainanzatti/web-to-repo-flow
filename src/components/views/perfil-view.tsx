@@ -1,9 +1,17 @@
 import { useState, useEffect, useCallback } from "react";
-import { User, Award, Clock, CheckCircle, Calendar, Save } from "lucide-react";
+import {
+  User,
+  Award,
+  Clock,
+  CheckCircle,
+  Calendar,
+  Save,
+} from "lucide-react";
 import {
   fetchUserPrefs,
   updateUserPrefs,
   fetchLancamentos,
+  fetchQuestoes,
   type UserPrefs,
 } from "../../lib/db";
 
@@ -25,13 +33,28 @@ export default function PerfilView() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [p, lancs] = await Promise.all([fetchUserPrefs(), fetchLancamentos()]);
+      const [p, lancs, quests] = await Promise.all([
+        fetchUserPrefs(),
+        fetchLancamentos(),
+        fetchQuestoes(),
+      ]);
       setPrefs(p);
       setNome(p.nome);
       const horasTotal = lancs.reduce((s, l) => s + l.minutos, 0) / 60;
       const aproveitamento =
-        lancs.length > 0 ? lancs.reduce((s, l) => s + l.mastery, 0) / lancs.length : 0;
-      setStats({ horasTotal, questoesFeitas: lancs.length, aproveitamento });
+        lancs.length > 0
+          ? lancs.reduce((s, l) => s + l.mastery, 0) / lancs.length
+          : 0;
+      const questoesAcertos = quests.filter((q) => q.acertou).length;
+      const questoesAproveitamento =
+        quests.length > 0
+          ? Math.round((questoesAcertos / quests.length) * 100)
+          : 0;
+      setStats({
+        horasTotal,
+        questoesFeitas: quests.length,
+        aproveitamento: questoesAproveitamento || aproveitamento,
+      });
     } catch (err) {
       console.error("Erro ao carregar perfil:", err);
     } finally {
@@ -55,7 +78,9 @@ export default function PerfilView() {
     }
   };
 
-  const diasAteProva = Math.ceil((PROVA_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24));
+  const diasAteProva = Math.ceil(
+    (PROVA_DATE.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+  );
 
   if (loading) {
     return (
@@ -73,7 +98,6 @@ export default function PerfilView() {
         </h1>
       </div>
 
-      {/* Contest info — primary */}
       <div className="card p-5 mb-6">
         <h3 className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-4">
           Concurso
@@ -91,20 +115,34 @@ export default function PerfilView() {
         </div>
       </div>
 
-      {/* Study stats — primary */}
       <div className="card p-5 mb-6">
         <h3 className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-4">
           Estatísticas de Estudo
         </h3>
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatItem icon={Clock} label="Horas estudadas" value={`${stats.horasTotal.toFixed(1)}h`} />
-          <StatItem icon={CheckCircle} label="Questões/Sessões" value={String(stats.questoesFeitas)} />
-          <StatItem icon={Award} label="Aproveitamento" value={`${Math.round(stats.aproveitamento)}%`} />
-          <StatItem icon={Calendar} label="Horas/dia meta" value={`${prefs?.horas_estudo_dia ?? 4}h`} />
+          <StatItem
+            icon={Clock}
+            label="Horas estudadas"
+            value={`${stats.horasTotal.toFixed(1)}h`}
+          />
+          <StatItem
+            icon={CheckCircle}
+            label="Questões feitas"
+            value={String(stats.questoesFeitas)}
+          />
+          <StatItem
+            icon={Award}
+            label="Aproveitamento"
+            value={`${Math.round(stats.aproveitamento)}%`}
+          />
+          <StatItem
+            icon={Calendar}
+            label="Horas/dia meta"
+            value={`${prefs?.horas_estudo_dia ?? 4}h`}
+          />
         </div>
       </div>
 
-      {/* Personal data — secondary */}
       <div className="card p-5">
         <h3 className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-4">
           Dados Pessoais
@@ -122,14 +160,18 @@ export default function PerfilView() {
                 className="flex-1 rounded-xl border border-ink-200 px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500"
                 placeholder="Seu nome"
               />
-              <button onClick={handleSave} disabled={saving} className="btn-primary">
+              <button
+                onClick={handleSave}
+                disabled={saving}
+                className="btn-primary"
+              >
                 <Save className="w-4 h-4" /> Salvar
               </button>
             </div>
           </div>
           <p className="text-xs text-ink-400">
-            Os dados pessoais (CPF, telefone, etc.) não são necessários para o estudo.
-            Mantenha o foco no que importa para o concurso.
+            Os dados pessoais (CPF, telefone, etc.) não são necessários para o
+            estudo. Mantenha o foco no que importa para o concurso.
           </p>
         </div>
       </div>
@@ -151,7 +193,11 @@ function InfoItem({
   return (
     <div>
       <p className="text-xs text-ink-500">{label}</p>
-      <p className={`text-sm font-semibold mt-0.5 flex items-center gap-1.5 ${highlight ? "text-warning-600" : "text-ink-900"}`}>
+      <p
+        className={`text-sm font-semibold mt-0.5 flex items-center gap-1.5 ${
+          highlight ? "text-warning-600" : "text-ink-900"
+        }`}
+      >
         {Icon && <Icon className="w-4 h-4" />}
         {value}
       </p>

@@ -43,6 +43,15 @@ export interface AiMaterialRow {
   criado_em: string;
 }
 
+export interface QuestaoRow {
+  id: string;
+  disciplina_id: string;
+  topico_id: string | null;
+  acertou: boolean;
+  fonte: string | null;
+  criado_em: string;
+}
+
 // ── Disciplines & Topics ──────────────────────────────────────
 export async function fetchDisciplines(): Promise<Discipline[]> {
   const { data, error } = await supabase
@@ -54,7 +63,10 @@ export async function fetchDisciplines(): Promise<Discipline[]> {
 }
 
 export async function fetchTopics(): Promise<Topic[]> {
-  const { data, error } = await supabase.from("topics").select("*").order("ordem");
+  const { data, error } = await supabase
+    .from("topics")
+    .select("*")
+    .order("ordem");
   if (error) throw error;
   return data as Topic[];
 }
@@ -99,7 +111,10 @@ export async function incrementSkip(disciplinaId: string): Promise<void> {
     const newMult = Math.min(3, 1 + newVezes * 0.5);
     const { error } = await supabase
       .from("skip_counts")
-      .update({ vezes_pulada: newVezes, multiplicador_urgencia: newMult })
+      .update({
+        vezes_pulada: newVezes,
+        multiplicador_urgencia: newMult,
+      })
       .eq("disciplina_id", disciplinaId);
     if (error) throw error;
   } else {
@@ -113,14 +128,14 @@ export async function incrementSkip(disciplinaId: string): Promise<void> {
 }
 
 export async function resetSkip(disciplinaId: string): Promise<void> {
-  const { error } = await supabase
-    .from("skip_counts")
-    .upsert({
+  const { error } = await supabase.from("skip_counts").upsert(
+    {
       disciplina_id: disciplinaId,
       vezes_pulada: 0,
       multiplicador_urgencia: 1.0,
-    })
-    .eq("disciplina_id", disciplinaId);
+    },
+    { onConflict: "disciplina_id" }
+  );
   if (error) throw error;
 }
 
@@ -135,7 +150,12 @@ export async function fetchUserPrefs(): Promise<UserPrefs> {
   if (!data) {
     const { data: created, error: insErr } = await supabase
       .from("user_prefs")
-      .insert({ id: 1, nome: "Estudante", sidebar_expandida: true, horas_estudo_dia: 4 })
+      .insert({
+        id: 1,
+        nome: "Estudante",
+        sidebar_expandida: true,
+        horas_estudo_dia: 4,
+      })
       .select()
       .single();
     if (insErr) throw insErr;
@@ -145,9 +165,14 @@ export async function fetchUserPrefs(): Promise<UserPrefs> {
 }
 
 export async function updateUserPrefs(
-  patch: Partial<Pick<UserPrefs, "nome" | "sidebar_expandida" | "horas_estudo_dia">>
+  patch: Partial<
+    Pick<UserPrefs, "nome" | "sidebar_expandida" | "horas_estudo_dia">
+  >
 ): Promise<void> {
-  const { error } = await supabase.from("user_prefs").update(patch).eq("id", 1);
+  const { error } = await supabase
+    .from("user_prefs")
+    .update(patch)
+    .eq("id", 1);
   if (error) throw error;
 }
 
@@ -197,7 +222,10 @@ export async function fetchFlashcardsPendentes(): Promise<FlashcardRow[]> {
 }
 
 export async function fetchAllFlashcards(): Promise<FlashcardRow[]> {
-  const { data, error } = await supabase.from("flashcards").select("*").order("criado_em");
+  const { data, error } = await supabase
+    .from("flashcards")
+    .select("*")
+    .order("criado_em");
   if (error) throw error;
   return (data ?? []) as FlashcardRow[];
 }
@@ -216,7 +244,9 @@ export async function insertFlashcards(
   if (error) throw error;
 }
 
-export async function deleteFlashcardsByTopico(topicoId: string): Promise<void> {
+export async function deleteFlashcardsByTopico(
+  topicoId: string
+): Promise<void> {
   const { error } = await supabase
     .from("flashcards")
     .delete()
@@ -266,7 +296,10 @@ export async function fetchRedacoes(): Promise<RedacaoRow[]> {
   return (data ?? []) as RedacaoRow[];
 }
 
-export async function insertRedacao(tema: string, texto: string): Promise<RedacaoRow> {
+export async function insertRedacao(
+  tema: string,
+  texto: string
+): Promise<RedacaoRow> {
   const { data, error } = await supabase
     .from("redacoes")
     .insert({ tema, texto })
@@ -285,5 +318,27 @@ export async function updateRedacaoCorrecao(
     .from("redacoes")
     .update({ nota, feedback_json: feedbackJson })
     .eq("id", id);
+  if (error) throw error;
+}
+
+// ── Questões ───────────────────────────────────────────────────
+export async function fetchQuestoes(): Promise<QuestaoRow[]> {
+  const { data, error } = await supabase
+    .from("questoes")
+    .select("*")
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as QuestaoRow[];
+}
+
+export async function insertQuestao(
+  row: Omit<QuestaoRow, "id" | "criado_em">
+): Promise<void> {
+  const { error } = await supabase.from("questoes").insert(row);
+  if (error) throw error;
+}
+
+export async function deleteQuestao(id: string): Promise<void> {
+  const { error } = await supabase.from("questoes").delete().eq("id", id);
   if (error) throw error;
 }

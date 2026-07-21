@@ -4,6 +4,7 @@ import Sidebar from "./components/sidebar";
 import PainelView from "./components/views/painel-view";
 import NucleoView from "./components/views/nucleo-view";
 import FlashcardsView from "./components/views/flashcards-view";
+import QuestoesView from "./components/views/questoes-view";
 import DesempenhoView from "./components/views/desempenho-view";
 import RedacaoView from "./components/views/redacao-view";
 import PerfilView from "./components/views/perfil-view";
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/" element={<PainelView />} />
           <Route path="/nucleo" element={<NucleoView />} />
           <Route path="/flashcards" element={<FlashcardsView />} />
+          <Route path="/questoes" element={<QuestoesView />} />
           <Route path="/desempenho" element={<DesempenhoView />} />
           <Route path="/redacao" element={<RedacaoView />} />
           <Route path="/perfil" element={<PerfilView />} />

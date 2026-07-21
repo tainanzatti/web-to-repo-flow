@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { NavLink } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -10,6 +10,7 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   Sparkles,
+  ClipboardList,
 } from "lucide-react";
 import { fetchUserPrefs, updateUserPrefs } from "../lib/db";
 
@@ -23,6 +24,7 @@ const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Painel", icon: LayoutDashboard },
   { to: "/nucleo", label: "Núcleo", icon: Lock },
   { to: "/flashcards", label: "Flashcards", icon: Layers },
+  { to: "/questoes", label: "Questões", icon: ClipboardList },
   { to: "/desempenho", label: "Desempenho", icon: BarChart3 },
   { to: "/redacao", label: "Redação", icon: PenLine },
   { to: "/perfil", label: "Perfil", icon: User },
@@ -42,7 +44,6 @@ export default function Sidebar({ flashcardsPendentes }: SidebarProps) {
         const prefs = await fetchUserPrefs();
         setExpandida(prefs.sidebar_expandida);
       } catch {
-        // fallback to localStorage
         const stored = localStorage.getItem("sidebar_expandida");
         if (stored !== null) setExpandida(stored === "true");
       }
@@ -62,7 +63,12 @@ export default function Sidebar({ flashcardsPendentes }: SidebarProps) {
   };
 
   if (!loaded) {
-    return <div className="w-64 shrink-0 bg-ink-950" style={{ minHeight: "100vh" }} />;
+    return (
+      <div
+        className="w-64 shrink-0 bg-ink-950"
+        style={{ minHeight: "100vh" }}
+      />
+    );
   }
 
   return (
@@ -72,7 +78,6 @@ export default function Sidebar({ flashcardsPendentes }: SidebarProps) {
       }`}
       style={{ minHeight: "100vh" }}
     >
-      {/* Toggle button */}
       <button
         onClick={toggle}
         className={`flex items-center gap-3 px-4 py-4 text-ink-300 hover:text-white hover:bg-ink-900 transition-colors border-b border-ink-800 ${
@@ -90,7 +95,6 @@ export default function Sidebar({ flashcardsPendentes }: SidebarProps) {
         )}
       </button>
 
-      {/* Nav items */}
       <nav className="flex-1 py-3 flex flex-col gap-1">
         {NAV_ITEMS.map((item) => {
           const Icon = item.icon;
@@ -128,8 +132,11 @@ export default function Sidebar({ flashcardsPendentes }: SidebarProps) {
         })}
       </nav>
 
-      {/* Footer */}
-      <div className={`px-4 py-3 border-t border-ink-800 ${expandida ? "text-left" : "text-center"}`}>
+      <div
+        className={`px-4 py-3 border-t border-ink-800 ${
+          expandida ? "text-left" : "text-center"
+        }`}
+      >
         {expandida ? (
           <div className="flex items-center gap-2 text-xs text-ink-400">
             <Sparkles className="w-3.5 h-3.5" />

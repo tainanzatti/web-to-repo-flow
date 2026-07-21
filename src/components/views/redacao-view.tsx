@@ -12,10 +12,10 @@ import {
   fetchRedacoes,
   insertRedacao,
   updateRedacaoCorrecao,
+  insertLancamento,
   type RedacaoRow,
 } from "../../lib/db";
 import { generateRedacaoTema, corrigirRedacao } from "../../lib/ai.functions";
-import { insertLancamento } from "../../lib/db";
 
 export default function RedacaoView() {
   const [tema, setTema] = useState("");
@@ -71,7 +71,11 @@ export default function RedacaoView() {
     try {
       const redacao = await insertRedacao(tema, texto);
       const result = await corrigirRedacao(texto);
-      await updateRedacaoCorrecao(redacao.id, result.nota, result.feedback as Record<string, unknown>);
+      await updateRedacaoCorrecao(
+        redacao.id,
+        result.nota,
+        result.feedback as Record<string, unknown>
+      );
 
       const corrigida: RedacaoRow = {
         ...redacao,
@@ -80,7 +84,6 @@ export default function RedacaoView() {
       };
       setCorrecao(corrigida);
 
-      // Feed nota into redacao discipline mastery (nota 0-10 → 0-100)
       await insertLancamento({
         disciplina_id: "redacao",
         topico_id: null,
@@ -122,7 +125,6 @@ export default function RedacaoView() {
         </p>
       </div>
 
-      {/* Theme section */}
       <div className="card p-5 mb-6">
         <div className="flex items-start justify-between gap-4 mb-3">
           <div className="flex-1">
@@ -132,7 +134,9 @@ export default function RedacaoView() {
             {tema ? (
               <h3 className="text-lg font-bold text-ink-900 mt-1">{tema}</h3>
             ) : (
-              <p className="text-sm text-ink-400 mt-1">Nenhum tema gerado ainda.</p>
+              <p className="text-sm text-ink-400 mt-1">
+                Nenhum tema gerado ainda.
+              </p>
             )}
             {proposta && (
               <p className="text-sm text-ink-500 mt-2">{proposta}</p>
@@ -153,7 +157,6 @@ export default function RedacaoView() {
         </div>
       </div>
 
-      {/* Writing area */}
       <div className="card p-5 mb-6">
         <label className="text-xs font-semibold text-ink-400 uppercase tracking-wide mb-2 block">
           Sua Redação
@@ -167,7 +170,8 @@ export default function RedacaoView() {
         <div className="flex items-center justify-between mt-3">
           <span className="text-xs text-ink-400">
             {texto.length} caracteres
-            {texto.length > 0 && ` · ${texto.trim().split(/\s+/).length} palavras`}
+            {texto.length > 0 &&
+              ` · ${texto.trim().split(/\s+/).length} palavras`}
           </span>
           <button
             onClick={handleCorrigir}
@@ -184,7 +188,6 @@ export default function RedacaoView() {
         </div>
       </div>
 
-      {/* Correction result */}
       {correcao && correcao.nota !== null && (
         <div className="card p-5 mb-6 animate-fadeIn">
           <div className="flex items-center gap-3 mb-4">
@@ -197,12 +200,16 @@ export default function RedacaoView() {
               </span>
               <h3 className="text-2xl font-bold text-ink-900">
                 {Number(correcao.nota).toFixed(1)}
-                <span className="text-base text-ink-400 font-normal">/10</span>
+                <span className="text-base text-ink-400 font-normal">
+                  /10
+                </span>
               </h3>
             </div>
           </div>
 
-          <h4 className="text-sm font-semibold text-ink-700 mb-3">Feedback por critério</h4>
+          <h4 className="text-sm font-semibold text-ink-700 mb-3">
+            Feedback por critério
+          </h4>
           <div className="space-y-3">
             {feedbackEntries.map(([key, value]) => (
               <div key={key} className="border-l-2 border-brand-200 pl-3">
@@ -216,7 +223,6 @@ export default function RedacaoView() {
         </div>
       )}
 
-      {/* History */}
       {redacoes.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-ink-700 mb-3 flex items-center gap-2">
@@ -224,10 +230,15 @@ export default function RedacaoView() {
           </h3>
           <div className="space-y-2">
             {redacoes.map((r) => (
-              <div key={r.id} className="card p-3 flex items-center gap-3">
+              <div
+                key={r.id}
+                className="card p-3 flex items-center gap-3"
+              >
                 <FileText className="w-4 h-4 text-ink-400 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink-800 truncate">{r.tema}</p>
+                  <p className="text-sm font-medium text-ink-800 truncate">
+                    {r.tema}
+                  </p>
                   <p className="text-xs text-ink-400">
                     {new Date(r.criado_em).toLocaleDateString("pt-BR")}
                   </p>

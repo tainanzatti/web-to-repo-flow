@@ -25,23 +25,26 @@ export interface RedacaoCorrecaoResult {
 const AI_GATEWAY_URL = "https://ai-gateway.bolt.app/v1/chat/completions";
 const AI_GATEWAY_MODEL = "gpt-4o-mini";
 
-function buildSystemPrompt(kind: AIKind, context: { topicoNome?: string; disciplinaNome?: string; textoRedacao?: string }): string {
+function buildSystemPrompt(
+  kind: AIKind,
+  context: { topicoNome?: string; disciplinaNome?: string; textoRedacao?: string }
+): string {
   switch (kind) {
     case "flashcards":
       return `Você é um especialista em concursos públicos brasileiros. Gere 5 a 10 pares de flashcards (pergunta/resposta) objetivos sobre o tópico "${context.topicoNome}" da disciplina "${context.disciplinaNome}" para o concurso PMSC Soldado 2026 (banca AOCP). As perguntas devem ser diretas e as respostas concisas (máx 2 frases). Responda APENAS em JSON: {"flashcards":[{"pergunta":"...","resposta":"..."}]}`;
-
     case "redacao-tema":
       return `Você é um especialista no concurso PMSC Soldado 2026 (banca Instituto AOCP). Gere UM tema de redação dissertativo-argumentativa baseado nos assuntos previstos no edital. O tema deve ser atual, relevante e no estilo da banca AOCP. Responda APENAS em JSON: {"tema":"...","proposta":"breve descrição do que se espera"}`;
-
     case "redacao-correcao":
       return `Você é um corretor de redações dissertativo-argumentativas para concurso público. Corrija a redação abaixo com base nos critérios: compreensão do tema, argumentação, estrutura/coesão, norma culta, conclusão/proposta. Dê uma nota de 0 a 10 (pode ser decimal) e feedback por critério. Responda APENAS em JSON: {"nota":7.5,"feedback":{"compreensao_tema":"...","argumentacao":"...","estrutura_coesao":"...","norma_culta":"...","conclusao_proposta":"..."}}`;
-
     default:
       return `Você é um especialista em concursos públicos brasileiros.`;
   }
 }
 
-function buildUserPrompt(kind: AIKind, context: { topicoNome?: string; disciplinaNome?: string; textoRedacao?: string }): string {
+function buildUserPrompt(
+  kind: AIKind,
+  context: { topicoNome?: string; disciplinaNome?: string; textoRedacao?: string }
+): string {
   switch (kind) {
     case "flashcards":
       return `Gere flashcards sobre: ${context.topicoNome} (${context.disciplinaNome}).`;
@@ -74,7 +77,8 @@ export async function callAI<T>(
         { role: "user", content: userPrompt },
       ],
       temperature: 0.7,
-      max_tokens: kind === "flashcards" ? 1500 : kind === "redacao-correcao" ? 1200 : 300,
+      max_tokens:
+        kind === "flashcards" ? 1500 : kind === "redacao-correcao" ? 1200 : 300,
     }),
   });
 
@@ -84,7 +88,6 @@ export async function callAI<T>(
 
   const data = await response.json();
   const content = data.choices?.[0]?.message?.content ?? "";
-
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("AI response did not contain valid JSON");
   return JSON.parse(jsonMatch[0]) as T;
