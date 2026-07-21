@@ -10,12 +10,16 @@ import { DesempenhoView } from "./components/views/desempenho-view";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { ThemeToggle } from "./components/ui/ThemeToggle";
 import { useAuth } from "./lib/auth-context";
 
 function AppLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen bg-ink-50">
+    <div className="flex min-h-screen bg-ink-50 dark:bg-ink-950">
       <Sidebar />
+      <div className="absolute top-4 left-20 z-50">
+        <ThemeToggle />
+      </div>
       <main className="flex-1 p-6 overflow-x-hidden">{children}</main>
     </div>
   );

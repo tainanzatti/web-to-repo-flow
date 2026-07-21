@@ -1,86 +1,82 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { useAuth } from './auth-context'
-import { fetchUserSettings, upsertUserSettings } from './db'
+import { createContext, useContext, useEffect, useState, useCallback, type ReactNode } from "react";
+import { supabase } from "./supabase";
+import { useAuth } from "./auth-context";
 
-export type ThemeMode = 'dark' | 'light' | 'auto'
+type Theme = "light" | "dark";
 
-type ThemeContextValue = {
-  theme: ThemeMode
-  resolved: 'dark' | 'light'
-  setTheme: (mode: ThemeMode) => void
+interface ThemeContextValue {
+  theme: Theme;
+  toggleTheme: () => void;
+  setTheme: (t: Theme) => void;
 }
 
-const ThemeContext = createContext<ThemeContextValue | null>(null)
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-function resolveTheme(mode: ThemeMode): 'dark' | 'light' {
-  if (mode === 'auto') {
-    if (typeof window === 'undefined') return 'dark'
-    return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
-  }
-  return mode
-}
+const STORAGE_KEY = "pmsc-theme";
 
-function applyTheme(resolved: 'dark' | 'light') {
-  if (typeof document === 'undefined') return
-  const el = document.documentElement
-  el.classList.remove('dark', 'light')
-  el.classList.add(resolved)
+function applyThemeClass(theme: Theme) {
+  const root = document.documentElement;
+  if (theme === "dark") root.classList.add("dark");
+  else root.classList.remove("dark");
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
-  const [theme, setThemeState] = useState<ThemeMode>('dark')
-  const [resolved, setResolved] = useState<'dark' | 'light'>('dark')
+  const { user } = useAuth();
+  const [theme, setThemeState] = useState<Theme>(() => {
+    const cached = localStorage.getItem(STORAGE_KEY) as Theme | null;
+    return cached ?? "light";
+  });
 
-  // Load from localStorage immediately (avoids flash), then from Supabase.
+  // Apply theme class immediately on mount and whenever theme changes
   useEffect(() => {
-    if (typeof window === 'undefined') return
-    const stored = (localStorage.getItem('theme') as ThemeMode | null) || 'dark'
-    setThemeState(stored)
-  }, [])
+    applyThemeClass(theme);
+    localStorage.setItem(STORAGE_KEY, theme);
+  }, [theme]);
 
+  // Load theme from Supabase profile when user logs in
   useEffect(() => {
-    if (!user) return
-    fetchUserSettings(user.id).then((s) => {
-      const t = (s?.theme as ThemeMode | undefined) || 'dark'
-      setThemeState(t)
-      if (typeof window !== 'undefined') localStorage.setItem('theme', t)
-    })
-  }, [user])
+    if (!user) return;
+    supabase
+      .from("profiles")
+      .select("tema")
+      .eq("id", user.id)
+      .maybeSingle()
+      .then(({ data }) => {
+        const dbTheme = (data as { tema?: string } | null)?.tema;
+        if (dbTheme === "dark" || dbTheme === "light") {
+          setThemeState(dbTheme);
+        }
+      });
+  }, [user]);
 
-  // Apply resolved theme + subscribe to system changes when auto.
-  useEffect(() => {
-    const r = resolveTheme(theme)
-    setResolved(r)
-    applyTheme(r)
-    if (theme !== 'auto' || typeof window === 'undefined') return
-    const mq = window.matchMedia('(prefers-color-scheme: light)')
-    const handler = () => {
-      const nr = mq.matches ? 'light' : 'dark'
-      setResolved(nr)
-      applyTheme(nr)
-    }
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [theme])
+  const setTheme = useCallback((t: Theme) => {
+    setThemeState(t);
+  }, []);
 
-  function setTheme(mode: ThemeMode) {
-    setThemeState(mode)
-    if (typeof window !== 'undefined') localStorage.setItem('theme', mode)
-    if (user) {
-      fetchUserSettings(user.id).then((s) =>
-        upsertUserSettings(user.id, { ...s, theme: mode }),
-      )
-    }
-  }
+  const toggleTheme = useCallback(() => {
+    setThemeState((prev) => {
+      const next: Theme = prev === "dark" ? "light" : "dark";
+      // Persist to Supabase if logged in
+      if (user) {
+        supabase
+          .from("profiles")
+          .update({ tema: next })
+          .eq("id", user.id)
+          .then(() => {});
+      }
+      return next;
+    });
+  }, [user]);
 
   return (
-    <ThemeContext.Provider value={{ theme, resolved, setTheme }}>{children}</ThemeContext.Provider>
-  )
+    <ThemeContext.Provider value={{ theme, toggleTheme, setTheme }}>
+      {children}
+    </ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {
-  const ctx = useContext(ThemeContext)
-  if (!ctx) throw new Error('useTheme must be used inside ThemeProvider')
-  return ctx
+  const ctx = useContext(ThemeContext);
+  if (!ctx) throw new Error("useTheme must be used within ThemeProvider");
+  return ctx;
 }

@@ -1,5 +1,3 @@
-import { createClient } from "npm:@supabase/supabase-js@2.45.4";
-
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
@@ -56,18 +54,8 @@ Retorne APENAS o texto do resumo, sem marcadores de código ou metadados.`;
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        contents: [
-          {
-            parts: [
-              { text: systemPrompt },
-              { text: userPrompt },
-            ],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          maxOutputTokens: 2048,
-        },
+        contents: [{ parts: [{ text: systemPrompt }, { text: userPrompt }] }],
+        generationConfig: { temperature: 0.7, maxOutputTokens: 2048 },
       }),
     });
 

@@ -8,11 +8,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 
 export function Button({ loading, children, disabled, className = "", ...props }: ButtonProps) {
   return (
-    <button
-      disabled={disabled || loading}
-      className={`btn ${className}`}
-      {...props}
-    >
+    <button disabled={disabled || loading} className={`btn ${className}`} {...props}>
       {loading && <Loader2 className="w-4 h-4 animate-spin" />}
       {children}
     </button>
