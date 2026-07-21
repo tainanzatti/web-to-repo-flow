@@ -28,7 +28,7 @@ import {
   nextHeroDiscipline,
   computeCycleStats,
   computeStreak,
-  maxTopicsForCycle,
+  maxTopicsForDiscipline,
   movingAverageMastery,
   type Lancamento,
 } from '@/lib/curriculum'
@@ -192,7 +192,6 @@ function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
 function CicloViewInner({ lancamentos, onOpenMaterial, onConcluir }: Props) {
   const cycleStats = useMemo(() => computeCycleStats(lancamentos), [lancamentos])
   const cycleNumber = cycleStats.completedCycles + 1
-  const maxCount = maxTopicsForCycle(cycleNumber)
   const heroDiscId = useMemo(() => nextHeroDiscipline(lancamentos), [lancamentos])
   const [selectedDiscId, setSelectedDiscId] = useState(heroDiscId)
 
@@ -204,9 +203,12 @@ function CicloViewInner({ lancamentos, onOpenMaterial, onConcluir }: Props) {
 
   const heroTopics = useMemo(() => {
     const all = disciplineTopicsWithMastery(lancamentos, selectedDiscId)
-    const active = selectActiveTopics(all, selectedDiscId, lancamentos, maxCount)
+    const active = selectActiveTopics(all, selectedDiscId, lancamentos)
     return allocateMinutes(active)
-  }, [lancamentos, selectedDiscId, maxCount])
+  }, [lancamentos, selectedDiscId])
+  const maxCount = maxTopicsForDiscipline(
+    useMemo(() => disciplineTopicsWithMastery(lancamentos, selectedDiscId), [lancamentos, selectedDiscId])
+  )
 
   const streak = useMemo(() => computeStreak(lancamentos), [lancamentos])
 

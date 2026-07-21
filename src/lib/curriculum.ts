@@ -321,15 +321,66 @@ export function computeStreak(lancamentos: Lancamento[]): number {
   return streak
 }
 
-// Próxima disciplina "herói" na sequência: a que vem depois do último lançamento.
-// Empate de datas é resolvido pela ordem de inserção (o registro mais recente vence).
+// Peso normalizado da disciplina no edital (questões / maior nº de questões entre disciplinas objetivas).
+const MAX_QUESTOES_OBJETIVAS = Math.max(
+  ...Object.values(CURRICULUM)
+    .map((d) => (typeof d.questoes === 'number' ? d.questoes : 0))
+)
+
+function editalWeight(discId: string): number {
+  const d = CURRICULUM[discId]
+  if (!d || typeof d.questoes !== 'number') return 0
+  return d.questoes / MAX_QUESTOES_OBJETIVAS
+}
+
+// Domínio médio de uma disciplina (0–100), null se sem lançamentos.
+function disciplineAverageMastery(lancamentos: Lancamento[], discId: string): number | null {
+  const entries = lancamentos.filter((l) => l.disciplinaId === discId)
+  if (entries.length === 0) return null
+  const quantidade = entries.reduce((a, e) => a + e.quantidade, 0)
+  if (quantidade === 0) return null
+  const acertos = entries.reduce((a, e) => a + e.acertos, 0)
+  return Math.round((acertos / quantidade) * 100)
+}
+
+// Dias desde a última revisão da disciplina (null se nunca tocada).
+function daysSinceLastDisciplineReview(lancamentos: Lancamento[], discId: string): number | null {
+  const entries = lancamentos
+    .filter((l) => l.disciplinaId === discId)
+    .sort((a, b) => (a.data < b.data ? 1 : -1))
+  if (entries.length === 0) return null
+  const today = new Date().toISOString().slice(0, 10)
+  return Math.round((new Date(today).getTime() - new Date(entries[0].data).getTime()) / 86400000)
+}
+
+// Fator de esquecimento cresce com o tempo desde a última revisão da disciplina.
+function forgettingFactor(days: number | null): number {
+  if (days === null) return 2.5 // nunca tocada — prioridade máxima
+  return Math.min(2.5, 1 + days / 5)
+}
+
+// Fila de prioridade ponderada: score = pesoEdital × (1 − domínio/100) × fatorEsquecimento.
+// A disciplina de maior score vira a próxima ativa. Garante que nenhuma disciplina fique
+// mais de um ciclo completo sem ser tocada: ao final de um ciclo completo (todas tocadas),
+// o esquecimento das primeiras já as impulsiona de novo.
 export function nextHeroDiscipline(lancamentos: Lancamento[]): string {
   if (lancamentos.length === 0) return ROTATION_ORDER[0]
-  const last = lancamentos
-    .map((l, idx) => ({ l, idx }))
-    .sort((a, b) => (a.l.data === b.l.data ? b.idx - a.idx : a.l.data < b.l.data ? 1 : -1))[0].l
-  const idx = ROTATION_ORDER.indexOf(last.disciplinaId as (typeof ROTATION_ORDER)[number])
-  return ROTATION_ORDER[(idx + 1) % ROTATION_ORDER.length]
+
+  let best = ROTATION_ORDER[0]
+  let bestScore = -Infinity
+  for (const discId of ROTATION_ORDER) {
+    const peso = editalWeight(discId)
+    const dominio = disciplineAverageMastery(lancamentos, discId)
+    const dominioNorm = dominio === null ? 0 : dominio / 100
+    const dias = daysSinceLastDisciplineReview(lancamentos, discId)
+    const esquecimento = forgettingFactor(dias)
+    const score = peso * (1 - dominioNorm) * esquecimento
+    if (score > bestScore) {
+      bestScore = score
+      best = discId
+    }
+  }
+  return best
 }
 
 // Usa a ordem de inserção real (não a data) — reflete a sequência de ações do usuário.
@@ -361,10 +412,22 @@ export function daysSinceLastStudy(lancamentos: Lancamento[]): number | null {
   return Math.round((new Date(today).getTime() - new Date(dates[0]).getTime()) / 86400000)
 }
 
-// Progressão: ciclo 1 = 1 tópico (hora cheia), ciclo 2 = 2 tópicos, ciclo 3+ = 3 (teto).
+// Teto de tópicos por desempenho real da disciplina: min(3, nº de tópicos ainda abaixo de "bom").
+// Disciplina fraca concentra tempo em poucos tópicos; disciplina forte divide entre os poucos que restam.
+export function maxTopicsForDiscipline(
+  topicsWithMastery: TopicWithMastery[]
+): number {
+  const belowGood = topicsWithMastery.filter((t) => {
+    const key = tierInfo(t.mastery).key
+    return key !== 'bom' && key !== 'dominado'
+  }).length
+  return Math.min(3, Math.max(1, belowGood))
+}
+
+// Mantido por compatibilidade com chamadas existentes — agora sempre retorna o teto (3).
+// Prefira maxTopicsForDiscipline(topicsWithMastery) no novo fluxo.
 export function maxTopicsForCycle(cycleNumber: number): number {
-  if (cycleNumber <= 1) return 1
-  if (cycleNumber === 2) return 2
+  void cycleNumber
   return 3
 }
 
@@ -381,8 +444,9 @@ export function selectActiveTopics(
   topicsWithMastery: TopicWithMastery[],
   discId: string,
   lancamentos: Lancamento[],
-  maxCount: number
+  maxCount?: number
 ): TopicWithMastery[] {
+  const cap = maxCount ?? maxTopicsForDiscipline(topicsWithMastery)
   const touchedIds = new Set(
     lancamentos.filter((l) => l.disciplinaId === discId).map((l) => l.topicoId)
   )
@@ -398,8 +462,8 @@ export function selectActiveTopics(
     .sort((a, b) => b.fib - a.fib)
 
   let selected = [...touched]
-  while (selected.length < maxCount && untouched.length > 0) selected.push(untouched.shift()!)
-  if (selected.length > maxCount) selected = selected.slice(0, maxCount)
+  while (selected.length < cap && untouched.length > 0) selected.push(untouched.shift()!)
+  if (selected.length > cap) selected = selected.slice(0, cap)
 
   const allDominado =
     selected.length > 0 && selected.every((t) => tierInfo(t.mastery).key === 'dominado')

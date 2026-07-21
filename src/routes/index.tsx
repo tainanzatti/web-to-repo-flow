@@ -22,8 +22,7 @@ import {
   allocateMinutes,
   selectActiveTopics,
   disciplineTopicsWithMastery,
-  computeCycleStats,
-  maxTopicsForCycle,
+  maxTopicsForDiscipline,
   type AllocatedTopic,
   type Lancamento,
 } from '@/lib/curriculum'
@@ -124,9 +123,8 @@ function OperacaoPMSC() {
 
   const openConcluir = useCallback(
     (discId: string) => {
-      const cycleStats = computeCycleStats(lancamentos)
-      const maxCount = maxTopicsForCycle(cycleStats.completedCycles + 1)
       const all = disciplineTopicsWithMastery(lancamentos, discId)
+      const maxCount = maxTopicsForDiscipline(all)
       const active = selectActiveTopics(all, discId, lancamentos, maxCount)
       setConcluir({ discId, topics: allocateMinutes(active) })
     },
