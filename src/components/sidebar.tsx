@@ -1,12 +1,12 @@
-import { useState } from "react";
-import { NavLink } from "react-router-dom";
-import { Shield, LayoutGrid, BookOpen, Layers, PenTool, BarChart3, User, ChevronLeft, ChevronRight, FileQuestion, Trophy, MessageSquare } from "lucide-react";
+import { NavLink, useNavigate } from "react-router-dom";
+import { LayoutDashboard, BookOpen, Layers, PenTool, MessageSquare, Trophy, BarChart3, User, LogOut, Shield } from "lucide-react";
+import { useAuth } from "../lib/auth-context";
 
 const NAV_ITEMS = [
-  { to: "/painel", label: "Painel", icon: LayoutGrid },
+  { to: "/painel", label: "Painel", icon: LayoutDashboard },
   { to: "/nucleo", label: "Núcleo", icon: BookOpen },
   { to: "/flashcards", label: "Flashcards", icon: Layers },
-  { to: "/questoes", label: "Questões", icon: FileQuestion },
+  { to: "/questoes", label: "Questões", icon: PenTool },
   { to: "/redacao", label: "Redação", icon: PenTool },
   { to: "/chat", label: "Chat IA", icon: MessageSquare },
   { to: "/ranking", label: "Ranking", icon: Trophy },
@@ -15,21 +15,34 @@ const NAV_ITEMS = [
 ];
 
 export function Sidebar() {
-  const [collapsed, setCollapsed] = useState(false);
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+
+  const handleSignOut = async () => { await signOut(); navigate("/login"); };
+
   return (
-    <aside className={`${collapsed ? "w-16" : "w-60"} shrink-0 bg-white dark:bg-ink-900 border-r border-ink-100 dark:border-ink-800 flex flex-col transition-all duration-300 h-screen sticky top-0`}>
-      <div className="flex items-center gap-3 px-4 py-5 border-b border-ink-100 dark:border-ink-800">
-        <div className="w-9 h-9 rounded-xl bg-brand-600 flex items-center justify-center shrink-0"><Shield className="w-5 h-5 text-white" /></div>
-        {!collapsed && <div className="overflow-hidden"><p className="text-sm font-bold text-ink-900 dark:text-ink-100 leading-tight">Operação</p><p className="text-xs text-ink-500 dark:text-ink-400 leading-tight">PMSC 2026</p></div>}
+    <aside className="w-16 lg:w-64 shrink-0 bg-white dark:bg-ink-900 border-r border-ink-100 dark:border-ink-800 flex flex-col sticky top-0 h-screen">
+      <div className="p-4 flex items-center gap-3 border-b border-ink-100 dark:border-ink-800">
+        <div className="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white shrink-0"><Shield className="w-5 h-5" /></div>
+        <span className="font-bold text-ink-900 dark:text-ink-100 hidden lg:block">PMSC Prep</span>
       </div>
-      <nav className="flex-1 py-3 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
-          <NavLink key={item.to} to={item.to} className={({ isActive }) => `flex items-center gap-3 mx-2 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors ${isActive ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300" : "text-ink-600 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800 hover:text-ink-900 dark:hover:text-ink-100"}`} title={collapsed ? item.label : undefined}>
-            <item.icon className="w-5 h-5 shrink-0" />{!collapsed && <span>{item.label}</span>}
-          </NavLink>
-        ))}
+      <nav className="flex-1 p-2 lg:p-3 space-y-1 overflow-y-auto">
+        {NAV_ITEMS.map((item) => {
+          const Icon = item.icon;
+          return (
+            <NavLink key={item.to} to={item.to} className={({ isActive }) => `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${isActive ? "bg-brand-50 dark:bg-brand-900/30 text-brand-700 dark:text-brand-300" : "text-ink-500 dark:text-ink-400 hover:bg-ink-50 dark:hover:bg-ink-800"}`}>
+              <Icon className="w-5 h-5 shrink-0" />
+              <span className="hidden lg:block">{item.label}</span>
+            </NavLink>
+          );
+        })}
       </nav>
-      <button onClick={() => setCollapsed(!collapsed)} className="flex items-center justify-center py-3 border-t border-ink-100 dark:border-ink-800 text-ink-400 hover:text-ink-700 dark:hover:text-ink-200 transition-colors">{collapsed ? <ChevronRight className="w-5 h-5" /> : <ChevronLeft className="w-5 h-5" />}</button>
+      <div className="p-2 lg:p-3 border-t border-ink-100 dark:border-ink-800">
+        <button onClick={handleSignOut} className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-error-600 dark:text-error-400 hover:bg-error-50 dark:hover:bg-error-900/20 transition-colors w-full">
+          <LogOut className="w-5 h-5 shrink-0" />
+          <span className="hidden lg:block">Sair</span>
+        </button>
+      </div>
     </aside>
   );
 }

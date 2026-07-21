@@ -1,34 +1,20 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { callLovableAI, optionsResponse, errorResponse, successResponse, extractJSON, type LovableMessage } from "../_shared/lovable-ai.ts";
+import { callLovableAI, extractJSON, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
+
+const SYSTEM_PROMPT = "Você é um professor especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC), banca AOCP. Gere questões de múltipla escolha (5 alternativas A-E) no estilo AOCP. Responda APENAS com JSON válido.";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return optionsResponse();
-
   try {
-    const { disciplina, topico, quantidade, system_prompt } = await req.json();
-
-    if (!disciplina || !topico) {
-      return errorResponse("Disciplina e tópico são obrigatórios", 400);
-    }
-
-    const qtd = Math.min(Math.max(quantidade ?? 5, 1), 10);
-
-    const messages: LovableMessage[] = [
-      { role: "system", content: system_prompt ?? "Você é um professor especialista em concursos públicos para a PMSC, banca AOCP." },
-      { role: "user", content: `Crie ${qtd} questões de múltipla escolha (5 alternativas A-E) sobre "${topico}" da disciplina "${disciplina}", no estilo da banca AOCP para o concurso da PMSC.\n\nAs questões devem:\n- Ter enunciado claro e objetivo\n- Ter 5 alternativas (A, B, C, D, E)\n- Ter exatamente uma resposta correta\n- Incluir explicação detalhada do porquê a resposta correta está certa e as outras erradas\n- Ser no nível de dificuldade de um concurso real\n\nRetorne APENAS um JSON válido no formato:\n{"questoes": [{"enunciado": "...", "alternativas": [{"letra": "A", "texto": "..."}, {"letra": "B", "texto": "..."}, {"letra": "C", "texto": "..."}, {"letra": "D", "texto": "..."}, {"letra": "E", "texto": "..."}], "correta": "A", "explicacao": "..."}]}` },
+    const { disciplina, topico, quantidade } = await req.json();
+    const qtd = Math.min(quantidade ?? 5, 10);
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `Gere ${qtd} questões sobre "${topico}" da disciplina "${disciplina}". Cada questão deve ter: enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, alternativa_e, resposta_correta (A/B/C/D/E), explicacao. Responda em JSON: {"questoes": [...]}` },
     ];
-
-    const { content, error } = await callLovableAI(messages, { temperature: 0.6, maxTokens: 3000, jsonMode: true });
-
-    if (error) return errorResponse(error, 502);
-
-    const parsed = extractJSON(content);
-    if (!parsed || !parsed.questoes) {
-      return errorResponse("Resposta da IA em formato inválido", 502);
-    }
-
-    return successResponse({ questoes: parsed.questoes });
-  } catch (error) {
-    return errorResponse((error as Error).message);
+    const raw = await callLovableAI(messages, { jsonMode: true, temperature: 0.8 });
+    const parsed = extractJSON<{ questoes: unknown[] }>(raw);
+    return successResponse(parsed);
+  } catch (err) {
+    return errorResponse(500, (err as Error).message);
   }
 });

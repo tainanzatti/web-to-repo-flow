@@ -1,34 +1,45 @@
-import { useState, type FormEvent } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { Mail, User, Phone, Calendar, CreditCard } from "lucide-react";
-import { AuthLayout } from "../ui/AuthLayout";
-import { Input } from "../ui/Input";
-import { PasswordInput } from "../ui/PasswordInput";
-import { Button } from "../ui/Button";
-import { ErrorMessage } from "../ui/FormField";
-import { ThemeToggle } from "../ui/ThemeToggle";
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "../../lib/auth-context";
-import { maskCPF, maskPhone, validateCPF, validateEmail, validatePhone, validatePassword, validateBirthDate, passwordStrength } from "../../lib/validations";
-import { supabase } from "../../lib/supabase";
+import { Loader2, Shield } from "lucide-react";
 
 export function Register() {
-  const { signUp } = useAuth(); const navigate = useNavigate();
-  const [nome, setNome] = useState(""); const [email, setEmail] = useState(""); const [password, setPassword] = useState("");
-  const [cpf, setCpf] = useState(""); const [phone, setPhone] = useState(""); const [birthDate, setBirthDate] = useState("");
-  const [loading, setLoading] = useState(false); const [errors, setErrors] = useState<Record<string, string>>({});
-  const strength = passwordStrength(password);
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault(); const ne: Record<string, string> = {};
-    if (!nome.trim()) ne.nome = "Nome é obrigatório"; if (!validateEmail(email)) ne.email = "E-mail inválido";
-    const pw = validatePassword(password); if (!pw.valid) ne.password = pw.message!;
-    if (!validateCPF(cpf)) ne.cpf = "CPF inválido"; if (!validatePhone(phone)) ne.phone = "Telefone inválido";
-    if (!birthDate) ne.birthDate = "Data obrigatória"; else if (!validateBirthDate(birthDate)) ne.birthDate = "Mínimo 16 anos";
-    if (Object.keys(ne).length > 0) { setErrors(ne); return; }
-    setLoading(true); const { error } = await signUp(email, password);
-    if (error) { setErrors({ form: error }); setLoading(false); return; }
-    const { data: sd } = await supabase.auth.getSession(); const uid = sd.session?.user?.id;
-    if (uid) await supabase.from("profiles").insert({ id: uid, nome, email, cpf: cpf.replace(/\D/g, ""), telefone: phone.replace(/\D/g, ""), data_nascimento: birthDate });
-    setLoading(false); navigate("/painel");
+  const { signUp } = useAuth();
+  const navigate = useNavigate();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    if (password !== confirm) { setError("As senhas não coincidem."); return; }
+    if (password.length < 6) { setError("A senha deve ter pelo menos 6 caracteres."); return; }
+    setLoading(true);
+    const { error } = await signUp(email, password);
+    setLoading(false);
+    if (error) setError(error);
+    else navigate("/");
   };
-  return <><ThemeToggle /><AuthLayout title="Criar conta" subtitle="Cadastre-se para começar a estudar para o Soldado PMSC 2026"><form onSubmit={handleSubmit} className="space-y-4">{errors.form && <div className="rounded-xl bg-error-50 dark:bg-error-900/30 px-4 py-3 text-sm text-error-700 dark:text-error-300 animate-fadeIn">{errors.form}</div>}<div><Input label="Nome completo" placeholder="Seu nome" icon={<User className="w-4 h-4" />} value={nome} onChange={(e) => setNome(e.target.value)} error={errors.nome} autoComplete="name" /><ErrorMessage message={errors.nome} /></div><div><Input label="E-mail" type="email" placeholder="seu@email.com" icon={<Mail className="w-4 h-4" />} value={email} onChange={(e) => setEmail(e.target.value)} error={errors.email} autoComplete="email" /><ErrorMessage message={errors.email} /></div><div><PasswordInput label="Senha" placeholder="••••••••" value={password} onChange={(e) => setPassword(e.target.value)} error={errors.password} autoComplete="new-password" /><ErrorMessage message={errors.password} />{password && <div className="mt-2"><div className="flex gap-1">{Array.from({ length: 6 }).map((_, i) => <div key={i} className={`h-1 flex-1 rounded-full transition-colors ${i < strength.score ? strength.color : "bg-ink-100 dark:bg-ink-800"}`} />)}</div><p className="text-xs text-ink-400 mt-1">{strength.label}</p></div>}</div><div className="grid grid-cols-2 gap-3"><div><Input label="CPF" placeholder="000.000.000-00" icon={<CreditCard className="w-4 h-4" />} value={cpf} onChange={(e) => setCpf(maskCPF(e.target.value))} error={errors.cpf} maxLength={14} /><ErrorMessage message={errors.cpf} /></div><div><Input label="Telefone" placeholder="(48) 99999-9999" icon={<Phone className="w-4 h-4" />} value={phone} onChange={(e) => setPhone(maskPhone(e.target.value))} error={errors.phone} maxLength={15} /><ErrorMessage message={errors.phone} /></div></div><div><Input label="Data de nascimento" type="date" icon={<Calendar className="w-4 h-4" />} value={birthDate} onChange={(e) => setBirthDate(e.target.value)} error={errors.birthDate} /><ErrorMessage message={errors.birthDate} /></div><Button type="submit" loading={loading} className="w-full btn-primary">Criar conta</Button></form><div className="mt-6 text-center text-sm text-ink-500 dark:text-ink-400">Já tem uma conta? <Link to="/login" className="text-brand-600 dark:text-brand-400 hover:text-brand-700 font-semibold transition-colors">Entrar</Link></div></AuthLayout></>;
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-ink-50 dark:bg-ink-950 p-4">
+      <div className="card p-8 max-w-md w-full animate-slideUp">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-12 h-12 rounded-xl bg-brand-600 flex items-center justify-center text-white"><Shield className="w-6 h-6" /></div>
+          <div><h1 className="text-xl font-bold text-ink-900 dark:text-ink-100">Concurso PMSC</h1><p className="text-sm text-ink-500 dark:text-ink-400">Criar nova conta</p></div>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">E-mail</label><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} className="input-base" placeholder="seu@email.com" /></div>
+          <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Senha</label><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} className="input-base" placeholder="Mínimo 6 caracteres" /></div>
+          <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Confirmar senha</label><input type="password" required value={confirm} onChange={(e) => setConfirm(e.target.value)} className="input-base" placeholder="••••••••" /></div>
+          {error && <p className="text-sm text-error-600 dark:text-error-400 bg-error-50 dark:bg-error-900/20 p-3 rounded-lg">{error}</p>}
+          <button type="submit" disabled={loading} className="btn-primary w-full flex items-center justify-center gap-2">{loading && <Loader2 className="w-4 h-4 animate-spin" />}Cadastrar</button>
+        </form>
+        <p className="text-sm text-ink-500 dark:text-ink-400 mt-4 text-center">Já tem conta? <Link to="/login" className="text-brand-600 dark:text-brand-400 font-medium hover:underline">Entrar</Link></p>
+      </div>
+    </div>
+  );
 }

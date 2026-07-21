@@ -1,8 +1,3 @@
-/**
- * Re-export from the centralized ai.service.ts.
- * This file is kept for backward compatibility with existing imports.
- * All new code should import directly from ai.service.ts.
- */
 export {
   aiChat,
   aiExplicar,

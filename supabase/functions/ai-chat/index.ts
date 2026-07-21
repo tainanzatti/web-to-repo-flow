@@ -1,31 +1,21 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { callLovableAI, optionsResponse, errorResponse, successResponse, type LovableMessage } from "../_shared/lovable-ai.ts";
+import { callLovableAI, corsHeaders, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
+
+const SYSTEM_PROMPT = "Você é um professor especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC), banca AOCP. Sua missão é ajudar o aluno com explicações claras, questões no estilo AOCP, correções de redação e orientações de estudo. Sempre use linguagem didática, precisa e motivadora.";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return optionsResponse();
-
   try {
-    const { messages, disciplina, topico } = await req.json();
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return errorResponse("Mensagens são obrigatórias", 400);
-    }
-
-    const contextStr = disciplina || topico
-      ? `\n\nContexto do candidato: ${disciplina ? `Disciplina: ${disciplina}` : ""}${disciplina && topico ? " · " : ""}${topico ? `Tópico: ${topico}` : ""}`
+    const { messages, context } = await req.json();
+    const ctxMsg = context?.disciplina || context?.topico
+      ? `\n\nContexto: Disciplina: ${context.disciplina ?? "—"}, Tópico: ${context.topico ?? "—"}`
       : "";
-
-    const lastUserMsg = messages[messages.length - 1];
-    if (contextStr && lastUserMsg) {
-      lastUserMsg.content = lastUserMsg.content + contextStr;
-    }
-
-    const { content, error } = await callLovableAI(messages, { temperature: 0.5, maxTokens: 2000 });
-
-    if (error) return errorResponse(error, 502);
-
-    return successResponse({ content });
-  } catch (error) {
-    return errorResponse((error as Error).message);
+    const fullMessages = [
+      { role: "system", content: SYSTEM_PROMPT + ctxMsg },
+      ...messages,
+    ];
+    const resposta = await callLovableAI(fullMessages);
+    return successResponse({ resposta });
+  } catch (err) {
+    return errorResponse(500, (err as Error).message);
   }
 });

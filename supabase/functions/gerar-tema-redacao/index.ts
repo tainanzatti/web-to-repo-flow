@@ -1,27 +1,18 @@
-import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { callLovableAI, optionsResponse, errorResponse, successResponse, type LovableMessage } from "../_shared/lovable-ai.ts";
+import { callLovableAI, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
+
+const SYSTEM_PROMPT = "Você é um professor especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC), banca AOCP. Gere temas de redação no estilo dos concursos da PMSC.";
 
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return optionsResponse();
-
   try {
-    const { conteudo, system_prompt } = await req.json();
-
-    if (!conteudo || typeof conteudo !== "string") {
-      return errorResponse("Conteúdo é obrigatório", 400);
-    }
-
-    const messages: LovableMessage[] = [
-      { role: "system", content: system_prompt ?? "Você é um professor especialista em concursos públicos para a PMSC, banca AOCP." },
-      { role: "user", content: `Com base no conteúdo de estudo fornecido abaixo, gere UM tema de redação dissertativa-argumentativa que seja relevante para o concurso da PMSC e que se relacione com os temas estudados pelo candidato.\n\nO tema deve ser:\n- Atual e relevante para a realidade da segurança pública\n- Relacionado ao conteúdo estudado quando possível\n- No formato de tema de redação dissertativa-argumentativa (conciso, claro, provocativo)\n- No máximo 120 caracteres\n\nRetorne APENAS o tema, sem explicações, sem aspas, sem texto adicional.\n\nConteúdo de estudo do candidato:\n${conteudo.slice(0, 4000)}` },
+    const { area } = await req.json();
+    const messages = [
+      { role: "system", content: SYSTEM_PROMPT },
+      { role: "user", content: `Gere um tema de redação para concurso${area ? ` na área de ${area}` : ""}. Responda apenas com o tema, sem explicações adicionais.` },
     ];
-
-    const { content, error } = await callLovableAI(messages, { temperature: 0.7, maxTokens: 150 });
-
-    if (error) return errorResponse(error, 502);
-
-    return successResponse({ tema: content });
-  } catch (error) {
-    return errorResponse((error as Error).message);
+    const tema = await callLovableAI(messages, { temperature: 0.8 });
+    return successResponse({ tema: tema.trim() });
+  } catch (err) {
+    return errorResponse(500, (err as Error).message);
   }
 });

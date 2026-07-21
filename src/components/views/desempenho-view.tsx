@@ -1,108 +1,99 @@
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, BarChart3, AlertCircle, Sparkles, TrendingUp, Star, CheckCircle } from "lucide-react";
-import { fetchDisciplines, fetchAllTopics, fetchLancamentos, fetchQuestoes, fetchSkipCounts } from "../../lib/db";
-import { computeDisciplinaData, tierFromMastery, type Discipline, type Topic, type Lancamento, type QuestaoRow } from "../../lib/curriculum";
+import { BarChart3, Loader2, Sparkles, AlertCircle, TrendingUp, Star, Target } from "lucide-react";
+import { useAuth } from "../../lib/auth-context";
+import { fetchRanking, fetchLancamentos, type RankingRow, type Lancamento } from "../../lib/db";
 import { aiAnaliseDesempenho, aiRecomendacoes, type AnaliseDesempenho } from "../../lib/ai.service";
-import { useTimer } from "../../lib/timer-context";
 
 export function DesempenhoView() {
-  const { studyStats } = useTimer();
-  const [disciplines, setDisciplines] = useState<Discipline[]>([]);
-  const [topics, setTopics] = useState<Topic[]>([]);
+  const { user } = useAuth();
+  const [ranking, setRanking] = useState<RankingRow | null>(null);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [questoes, setQuestoes] = useState<QuestaoRow[]>([]);
-  const [skipCounts, setSkipCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [analise, setAnalise] = useState<AnaliseDesempenho | null>(null);
-  const [analiseLoading, setAnaliseLoading] = useState(false);
-  const [analiseErro, setAnaliseErro] = useState<string | null>(null);
-  const [recomendacoes, setRecomendacoes] = useState<string[] | null>(null);
-  const [recomLoading, setRecomLoading] = useState(false);
-  const [recomErro, setRecomErro] = useState<string | null>(null);
+  const [recomendacoes, setRecomendacoes] = useState<string[]>([]);
+  const [loadingAI, setLoadingAI] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    const [d, t, l, q, s] = await Promise.all([fetchDisciplines(), fetchAllTopics(), fetchLancamentos(), fetchQuestoes(), fetchSkipCounts()]);
-    setDisciplines(d); setTopics(t); setLancamentos(l); setQuestoes(q); setSkipCounts(s); setLoading(false);
-  }, []);
+    if (!user) return;
+    setLoading(true);
+    try {
+      const [rows, lans] = await Promise.all([
+        fetchRanking("all").then((r) => r.find((x) => x.user_id === user.id) ?? null).catch(() => null),
+        fetchLancamentos(100).catch(() => []),
+      ]);
+      setRanking(rows);
+      setLancamentos(lans);
+    } catch { /* ignore */ }
+    setLoading(false);
+  }, [user]);
+
   useEffect(() => { load(); }, [load]);
 
-  const rows = disciplines.map((d) => {
-    const dT = topics.filter((t) => t.disciplina_id === d.id); const dL = lancamentos.filter((l) => l.disciplina_id === d.id); const dQ = questoes.filter((q) => q.disciplina_id === d.id);
-    const data = computeDisciplinaData(d, dT, dL, (skipCounts[d.id] ?? 0) > 0 ? 1.5 : 1); const acertos = dQ.filter((q) => q.acertou).length;
-    return { discipline: d, dominio: data.dominioMedio, topicosNaoDominados: data.topicosNaoDominados, totalTopicos: dT.length, questoes: dQ.length, acertos, taxa: dQ.length > 0 ? (acertos / dQ.length) * 100 : 0, skips: skipCounts[d.id] ?? 0, tier: tierFromMastery(data.dominioMedio) };
-  });
-  const tc: Record<string, string> = { ruim: "text-error-600 bg-error-50 dark:text-error-400 dark:bg-error-900/30", medio: "text-warning-600 bg-warning-50 dark:text-warning-400 dark:bg-warning-900/30", bom: "text-success-600 bg-success-50 dark:text-success-400 dark:bg-success-900/30", otimo: "text-success-700 bg-success-100 dark:text-success-300 dark:bg-success-900/40" };
-
-  const totalAcertos = questoes.filter((q) => q.acertou).length;
-  const taxaGeral = questoes.length > 0 ? (totalAcertos / questoes.length) * 100 : 0;
-
   const handleAnalise = async () => {
-    setAnaliseLoading(true); setAnaliseErro(null); setAnalise(null);
-    const dadosDisciplinas = rows.map((r) => ({ nome: r.discipline.nome, dominio: r.dominio, questoes: r.questoes, acertos: r.acertos, taxa: r.taxa }));
-    const { analise: a, error } = await aiAnaliseDesempenho({ disciplinas: dadosDisciplinas, taxaAcertosGeral: taxaGeral, horasEstudadas: (studyStats?.total ?? 0) / 3600, topicosEstudados: topics.length, diasConsecutivos: 0 });
-    if (error || !a) { setAnaliseErro(error ?? "Erro ao analisar"); setAnaliseLoading(false); return; }
-    setAnalise(a); setAnaliseLoading(false);
-  };
-
-  const handleRecomendacoes = async () => {
-    setRecomLoading(true); setRecomErro(null); setRecomendacoes(null);
-    const dadosDisc = rows.map((r) => ({ nome: r.discipline.nome, dominio: r.dominio, peso_edital: r.discipline.peso_edital, topicosNaoDominados: r.topicosNaoDominados }));
-    const { recomendacoes: recs, error } = await aiRecomendacoes({ disciplinas: dadosDisc, diasRestantes: 180 });
-    if (error || !recs) { setRecomErro(error ?? "Erro ao gerar recomendações"); setRecomLoading(false); return; }
-    setRecomendacoes(recs); setRecomLoading(false);
+    setLoadingAI(true); setError(null);
+    try {
+      const dados = {
+        xp_total: ranking?.xp_total ?? 0,
+        taxa_acertos: ranking?.taxa_acertos ?? 0,
+        questoes_respondidas: ranking?.questoes_respondidas ?? 0,
+        questoes_corretas: ranking?.questoes_corretas ?? 0,
+        horas_estudadas: ranking?.horas_estudadas ?? 0,
+        topicos_estudados: ranking?.topicos_estudados ?? 0,
+        dias_consecutivos: ranking?.dias_consecutivos ?? 0,
+        percentual_edital: ranking?.percentual_edital ?? 0,
+        lancamentos: lancamentos.slice(0, 20),
+      };
+      const [a, r] = await Promise.all([aiAnaliseDesempenho(dados), aiRecomendacoes(dados)]);
+      setAnalise(a);
+      setRecomendacoes(r);
+    } catch (err) { setError((err as Error).message); }
+    setLoadingAI(false);
   };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100">Desempenho</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Acompanhe seu domínio, questões e pulos por disciplina. Use a IA para análise e recomendações.</p></div>
-      <div className="flex flex-wrap gap-2">
-        <button onClick={handleAnalise} disabled={analiseLoading} className="btn-primary">{analiseLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analisando...</> : <><Sparkles className="w-4 h-4" /> Análise com IA</>}</button>
-        <button onClick={handleRecomendacoes} disabled={recomLoading} className="btn-secondary">{recomLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando...</> : <><TrendingUp className="w-4 h-4" /> Recomendações IA</>}</button>
+      <div className="flex items-center justify-between">
+        <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100 flex items-center gap-2"><BarChart3 className="w-7 h-7 text-brand-600" />Desempenho</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Analise seu progresso com IA.</p></div>
+        <button onClick={handleAnalise} disabled={loadingAI} className="btn-primary flex items-center gap-2">{loadingAI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}Analisar com IA</button>
       </div>
+
+      {error && <div className="card p-4 text-sm text-error-600 dark:text-error-400 flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
+
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard icon={<Target className="w-5 h-5" />} label="XP" value={String(ranking?.xp_total ?? 0)} color="brand" />
+        <StatCard icon={<Target className="w-5 h-5" />} label="Acertos" value={`${(ranking?.taxa_acertos ?? 0).toFixed(0)}%`} color="success" />
+        <StatCard icon={<BarChart3 className="w-5 h-5" />} label="Questões" value={String(ranking?.questoes_respondidas ?? 0)} color="warning" />
+        <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Horas" value={`${(ranking?.horas_estudadas ?? 0).toFixed(1)}h`} color="ink" />
+        <StatCard icon={<Star className="w-5 h-5" />} label="Tópicos" value={String(ranking?.topicos_estudados ?? 0)} color="brand" />
+        <StatCard icon={<Target className="w-5 h-5" />} label="% Edital" value={`${(ranking?.percentual_edital ?? 0).toFixed(0)}%`} color="error" />
+      </div>
+
       {analise && (
-        <div className="card p-6 animate-slideUp">
-          <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Análise de Desempenho</h3>
-          <p className="text-sm text-ink-700 dark:text-ink-300 mb-4">{analise.resumo}</p>
+        <div className="space-y-4 animate-slideUp">
+          <div className="card p-6"><h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-2">Resumo</h3><p className="text-sm text-ink-700 dark:text-ink-300">{analise.resumo}</p></div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div><h4 className="text-xs font-bold text-success-600 dark:text-success-400 mb-2 flex items-center gap-1"><Star className="w-3.5 h-3.5" /> Pontos Fortes</h4><ul className="space-y-1">{analise.pontosFortes.map((p, i) => <li key={i} className="text-xs text-ink-600 dark:text-ink-400 flex items-start gap-1"><CheckCircle className="w-3 h-3 mt-0.5 text-success-500 shrink-0" /> {p}</li>)}</ul></div>
-            <div><h4 className="text-xs font-bold text-error-600 dark:text-error-400 mb-2 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Pontos Fracos</h4><ul className="space-y-1">{analise.pontosFracos.map((p, i) => <li key={i} className="text-xs text-ink-600 dark:text-ink-400 flex items-start gap-1"><AlertCircle className="w-3 h-3 mt-0.5 text-error-500 shrink-0" /> {p}</li>)}</ul></div>
+            <div className="card p-6"><h3 className="text-sm font-bold text-success-600 dark:text-success-400 mb-3 flex items-center gap-2"><Star className="w-4 h-4" />Pontos Fortes</h3><ul className="space-y-2">{analise.pontos_fortes.map((p, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><CheckMini /> {p}</li>)}</ul></div>
+            <div className="card p-6"><h3 className="text-sm font-bold text-error-600 dark:text-error-400 mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4" />Pontos Fracos</h3><ul className="space-y-2">{analise.pontos_fracos.map((p, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><AlertMini /> {p}</li>)}</ul></div>
           </div>
-          <div className="mt-4"><h4 className="text-xs font-bold text-brand-600 dark:text-brand-400 mb-2">Recomendações</h4><ul className="space-y-1">{analise.recomendacoes.map((r, i) => <li key={i} className="text-xs text-ink-600 dark:text-ink-400 flex items-start gap-1"><TrendingUp className="w-3 h-3 mt-0.5 text-brand-500 shrink-0" /> {r}</li>)}</ul></div>
+          {analise.sugestoes.length > 0 && (
+            <div className="card p-6"><h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-3">Sugestões</h3><ul className="space-y-2">{analise.sugestoes.map((s, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><Sparkles className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" /> {s}</li>)}</ul></div>
+          )}
         </div>
       )}
-      {analiseErro && <p className="text-xs text-error-600 dark:text-error-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {analiseErro}</p>}
-      {recomendacoes && (
-        <div className="card p-6 animate-slideUp">
-          <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Recomendações Personalizadas</h3>
-          <ul className="space-y-2">{recomendacoes.map((r, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><span className="w-6 h-6 rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span> {r}</li>)}</ul>
-        </div>
+
+      {recomendacoes.length > 0 && (
+        <div className="card p-6 animate-slideUp"><h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand-500" />Recomendações Personalizadas</h3><ul className="space-y-2">{recomendacoes.map((r, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><span className="w-5 h-5 rounded-full bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span> {r}</li>)}</ul></div>
       )}
-      {recomErro && <p className="text-xs text-error-600 dark:text-error-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {recomErro}</p>}
-      <div className="card overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead><tr className="border-b border-ink-100 dark:border-ink-800"><th className="text-left font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Disciplina</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Domínio</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Tópicos</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Questões</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Acertos</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Pulos</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Nível</th></tr></thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.discipline.id} className="border-b border-ink-50 dark:border-ink-800 last:border-0 hover:bg-ink-50/50 dark:hover:bg-ink-800/50 transition-colors">
-                <td className="px-4 py-3 font-medium text-ink-800 dark:text-ink-200">{r.discipline.nome}</td>
-                <td className="px-4 py-3 text-center"><div className="flex items-center justify-center gap-2"><div className="w-16 h-1.5 bg-ink-100 dark:bg-ink-800 rounded-full overflow-hidden"><div className="h-full bg-brand-500 rounded-full" style={{ width: `${r.dominio}%` }} /></div><span className="text-xs text-ink-500 dark:text-ink-400">{Math.round(r.dominio)}%</span></div></td>
-                <td className="px-4 py-3 text-center text-ink-600 dark:text-ink-400">{r.totalTopicos - r.topicosNaoDominados}/{r.totalTopicos}</td>
-                <td className="px-4 py-3 text-center text-ink-600 dark:text-ink-400">{r.questoes}</td>
-                <td className="px-4 py-3 text-center text-ink-600 dark:text-ink-400">{r.questoes > 0 ? `${r.taxa.toFixed(0)}%` : "—"}</td>
-                <td className="px-4 py-3 text-center">{r.skips > 0 ? <span className="inline-flex items-center gap-1 text-warning-600 dark:text-warning-400"><AlertCircle className="w-3 h-3" /> {r.skips}</span> : <span className="text-ink-300 dark:text-ink-600">0</span>}</td>
-                <td className="px-4 py-3 text-center"><span className={`text-xs px-2 py-1 rounded-full ${tc[r.tier]}`}>{r.tier}</span></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="card p-4 flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center"><BarChart3 className="w-5 h-5 text-brand-600 dark:text-brand-400" /></div><div><p className="text-xs text-ink-500 dark:text-ink-400">Domínio geral</p><p className="text-lg font-bold text-ink-900 dark:text-ink-100">{rows.length > 0 ? Math.round(rows.reduce((a, b) => a + b.dominio, 0) / rows.length) : 0}%</p></div></div>
-        <div className="card p-4 flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-success-50 dark:bg-success-900/30 flex items-center justify-center"><BarChart3 className="w-5 h-5 text-success-600 dark:text-success-400" /></div><div><p className="text-xs text-ink-500 dark:text-ink-400">Total de questões</p><p className="text-lg font-bold text-ink-900 dark:text-ink-100">{questoes.length}</p></div></div>
-        <div className="card p-4 flex items-center gap-3"><div className="w-10 h-10 rounded-xl bg-warning-50 dark:bg-warning-900/30 flex items-center justify-center"><AlertCircle className="w-5 h-5 text-warning-600 dark:text-warning-400" /></div><div><p className="text-xs text-ink-500 dark:text-ink-400">Total de pulos</p><p className="text-lg font-bold text-ink-900 dark:text-ink-100">{Object.values(skipCounts).reduce((a, b) => a + b, 0)}</p></div></div>
-      </div>
     </div>
   );
 }
+
+function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
+  const cm: Record<string, string> = { brand: "bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300", success: "bg-success-50 text-success-600 dark:bg-success-900/30 dark:text-success-300", warning: "bg-warning-50 text-warning-600 dark:bg-warning-900/30 dark:text-warning-300", ink: "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300", error: "bg-error-50 text-error-600 dark:bg-error-900/30 dark:text-error-300" };
+  return <div className="card p-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${cm[color] ?? cm.brand}`}>{icon}</div><p className="text-lg font-bold text-ink-900 dark:text-ink-100">{value}</p><p className="text-xs text-ink-500 dark:text-ink-400">{label}</p></div>;
+}
+function CheckMini() { return <svg className="w-4 h-4 text-success-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>; }
+function AlertMini() { return <svg className="w-4 h-4 text-error-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>; }
