@@ -1,182 +1,165 @@
-import { memo, useMemo, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import {
-  ResponsiveContainer,
   RadarChart,
   PolarGrid,
   PolarAngleAxis,
+  PolarRadiusAxis,
   Radar,
-  Legend,
+  ResponsiveContainer,
   Tooltip,
 } from 'recharts'
-import { Clock, BookOpen, TrendingUp, ArrowUp, ArrowDown } from 'lucide-react'
-import { CURRICULUM, ROTATION_ORDER, disciplineAggregate, type Lancamento } from '@/lib/curriculum'
-import { SectionLabel } from '@/components/ui-bits'
+import { fetchDisciplines, fetchAllTopics, fetchLancamentos } from '../../lib/db'
+import type { Discipline, Topic, Lancamento } from '../../lib/types'
+import { computeDisciplineMastery } from '../../lib/curriculum'
 
-type Props = { lancamentos: Lancamento[] }
+export default function ComparativoView() {
+  const [disciplines, setDisciplines] = useState<Discipline[]>([])
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [loading, setLoading] = useState(true)
 
-// Médias fictícias da "concorrência" para comparação.
-const RIVAL_HOURS = 18
-const RIVAL_TOPICS_DAY = 3.1
-const RIVAL_DISC_PCT: Record<string, number> = {
-  legislacaoInstitucional: 74,
-  direitoConstitucional: 68,
-  linguaPortuguesa: 71,
-  direitoPenal: 66,
-  direitoProcessualPenal: 63,
-  direitoPenalMilitar: 60,
-  legislacaoEspecial: 65,
-  legislacaoTransito: 70,
-  informatica: 72,
-  redacao: 55,
-}
+  useEffect(() => {
+    Promise.all([
+      fetchDisciplines(),
+      fetchAllTopics(),
+      fetchLancamentos(),
+    ]).then(([d, t, l]) => {
+      setDisciplines(d)
+      setTopics(t)
+      setLancamentos(l)
+      setLoading(false)
+    })
+  }, [])
 
-function ComparativoViewInner({ lancamentos }: Props) {
-  const [win, setWin] = useState<number | null>(30)
+  const chartData = useMemo(() => {
+    return disciplines
+      .filter((d) => !d.is_redacao)
+      .map((d) => {
+        const dm = computeDisciplineMastery(d, topics, lancamentos)
+        return {
+          subject: d.nome.length > 18 ? d.nome.slice(0, 16) + '…' : d.nome,
+          domínio: Math.round(dm.masteryMedio),
+          peso: d.peso_edital * 10,
+        }
+      })
+  }, [disciplines, topics, lancamentos])
 
-  const filtered = useMemo(() => {
-    if (win === null) return lancamentos
-    const cutoff = new Date(Date.now() - win * 86400000).toISOString().slice(0, 10)
-    return lancamentos.filter((l) => l.data >= cutoff)
-  }, [lancamentos, win])
-
-  const userMin = filtered.reduce((a, e) => a + (e.minutos || 0), 0)
-  const userHours = +(userMin / 60).toFixed(1)
-  const days = new Set(filtered.map((l) => l.data)).size || 1
-  const touched = new Set(filtered.map((l) => l.disciplinaId + l.topicoId)).size
-  const userTopicsDay = +(touched / days).toFixed(1)
-
-  const radarData = ROTATION_ORDER.filter((id) => CURRICULUM[id].questoes !== 'P2').map((id) => ({
-    disciplina: CURRICULUM[id].name.replace('Direito ', 'D. ').replace('Legislação ', 'Leg. '),
-    voce: disciplineAggregate(filtered, id).pct ?? 0,
-    concorrencia: RIVAL_DISC_PCT[id] ?? 65,
-  }))
+  if (loading) {
+    return <div className="loading-spinner">Carregando comparativo...</div>
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex gap-1.5">
-        {[
-          { label: '30 dias', days: 30 },
-          { label: '90 dias', days: 90 },
-          { label: 'Tudo', days: null },
-        ].map((w) => (
-          <button
-            key={w.label}
-            onClick={() => setWin(w.days)}
-            className={`rounded-md px-3 py-1 text-[11px] font-medium transition ${
-              win === w.days
-                ? 'bg-primary text-primary-foreground'
-                : 'border border-border text-muted-foreground hover:text-foreground'
-            }`}
-          >
-            {w.label}
-          </button>
-        ))}
+    <div className="view-container">
+      <div className="view-header">
+        <h1 className="view-title">Comparativo</h1>
+        <p className="view-subtitle">
+          Radar de domínio entre disciplinas (azul) sobreposto ao peso no edital
+          (verde).
+        </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <CompareCard
-          label="Horas estudadas"
-          icon={Clock}
-          userValue={`${userHours}h`}
-          rivalValue={`${RIVAL_HOURS}h`}
-          up={userHours >= RIVAL_HOURS}
-        />
-        <CompareCard
-          label="Assuntos estudados"
-          icon={BookOpen}
-          userValue={String(touched)}
-          rivalValue="20"
-          up={touched >= 20}
-        />
-        <CompareCard
-          label="Média de assuntos/dia"
-          icon={TrendingUp}
-          userValue={userTopicsDay.toFixed(1)}
-          rivalValue={RIVAL_TOPICS_DAY.toFixed(1)}
-          up={userTopicsDay >= RIVAL_TOPICS_DAY}
-        />
+      <div className="card" style={{ padding: 24 }}>
+        <ResponsiveContainer width="100%" height={450}>
+          <RadarChart data={chartData}>
+            <PolarGrid stroke="var(--border)" />
+            <PolarAngleAxis
+              dataKey="subject"
+              tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
+            />
+            <PolarRadiusAxis
+              domain={[0, 100]}
+              tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
+              stroke="var(--border)"
+            />
+            <Radar
+              name="Domínio"
+              dataKey="domínio"
+              stroke="var(--primary)"
+              fill="var(--primary)"
+              fillOpacity={0.3}
+            />
+            <Radar
+              name="Peso edital (×10)"
+              dataKey="peso"
+              stroke="var(--success)"
+              fill="var(--success)"
+              fillOpacity={0.15}
+            />
+            <Tooltip
+              contentStyle={{
+                background: 'var(--bg-elevated)',
+                border: '1px solid var(--border-light)',
+                borderRadius: 8,
+                fontSize: 13,
+              }}
+            />
+          </RadarChart>
+        </ResponsiveContainer>
       </div>
 
-      <div className="rounded-2xl border border-border-soft bg-card p-5">
-        <SectionLabel>DESEMPENHO POR DISCIPLINA — VOCÊ vs CONCORRÊNCIA</SectionLabel>
-        <div className="h-80">
-          <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={radarData} outerRadius="70%">
-              <PolarGrid stroke="var(--border)" />
-              <PolarAngleAxis
-                dataKey="disciplina"
-                tick={{ fill: 'var(--muted-foreground)', fontSize: 9 }}
-              />
-              <Radar
-                name="Concorrência"
-                dataKey="concorrencia"
-                stroke="var(--faint)"
-                fill="var(--faint)"
-                fillOpacity={0.15}
-              />
-              <Radar
-                name="Você"
-                dataKey="voce"
-                stroke="var(--primary)"
-                fill="var(--primary)"
-                fillOpacity={0.4}
-              />
-              <Legend wrapperStyle={{ fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{
-                  background: 'var(--card-raised)',
-                  border: '1px solid var(--border)',
-                  borderRadius: 8,
-                  fontSize: 12,
-                }}
-                formatter={(v: number) => `${v}%`}
-              />
-            </RadarChart>
-          </ResponsiveContainer>
-        </div>
+      <div className="card" style={{ marginTop: 20 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+          Heatmap de dias estudados
+        </h3>
+        <Heatmap lancamentos={lancamentos} />
       </div>
     </div>
   )
 }
 
-function CompareCard({
-  label,
-  icon: Icon,
-  userValue,
-  rivalValue,
-  up,
-}: {
-  label: string
-  icon: typeof Clock
-  userValue: string
-  rivalValue: string
-  up: boolean
-}) {
+function Heatmap({ lancamentos }: { lancamentos: Lancamento[] }) {
+  const days = useMemo(() => {
+    const map = new Map<string, number>()
+    for (const l of lancamentos) {
+      const day = l.criado_em.slice(0, 10)
+      map.set(day, (map.get(day) ?? 0) + l.minutos)
+    }
+    return map
+  }, [lancamentos])
+
+  const weeks: Array<Array<{ date: string; minutes: number }>> = []
+  const today = new Date()
+  const start = new Date(today)
+  start.setDate(start.getDate() - 7 * 16)
+  start.setDate(start.getDate() - start.getDay())
+
+  for (let w = 0; w < 16; w++) {
+    const week: Array<{ date: string; minutes: number }> = []
+    for (let d = 0; d < 7; d++) {
+      const date = new Date(start)
+      date.setDate(date.getDate() + w * 7 + d)
+      const dateStr = date.toISOString().slice(0, 10)
+      week.push({ date: dateStr, minutes: days.get(dateStr) ?? 0 })
+    }
+    weeks.push(week)
+  }
+
+  function colorFor(min: number): string {
+    if (min === 0) return 'var(--neutral-800)'
+    if (min < 30) return 'rgba(59,130,246,0.25)'
+    if (min < 60) return 'rgba(59,130,246,0.5)'
+    if (min < 120) return 'rgba(59,130,246,0.75)'
+    return 'var(--primary)'
+  }
+
   return (
-    <div className="rounded-xl border border-border-soft bg-card p-4">
-      <div className="mb-3 flex items-center gap-2">
-        <Icon size={14} className="text-muted-foreground" />
-        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
-      </div>
-      <div className="flex items-end justify-between">
-        <div>
-          <div className="flex items-center gap-1.5">
-            <span className="font-mono text-2xl font-bold text-foreground">{userValue}</span>
-            {up ? (
-              <ArrowUp size={16} className="text-success" />
-            ) : (
-              <ArrowDown size={16} className="text-primary" />
-            )}
-          </div>
-          <span className="text-[10px] text-faint">Você</span>
+    <div style={{ display: 'flex', gap: 3, overflowX: 'auto' }}>
+      {weeks.map((week, wi) => (
+        <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {week.map((day) => (
+            <div
+              key={day.date}
+              title={`${day.date}: ${day.minutes} min`}
+              style={{
+                width: 14,
+                height: 14,
+                borderRadius: 3,
+                background: colorFor(day.minutes),
+              }}
+            />
+          ))}
         </div>
-        <div className="text-right">
-          <div className="font-mono text-lg font-bold text-faint">{rivalValue}</div>
-          <span className="text-[10px] text-faint">Concorrência</span>
-        </div>
-      </div>
+      ))}
     </div>
   )
 }
-
-export const ComparativoView = memo(ComparativoViewInner)

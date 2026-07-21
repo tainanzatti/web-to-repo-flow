@@ -1,90 +1,321 @@
-import { useEffect, useState, useCallback } from "react";
-import { PenTool, Loader2, Sparkles, Send, Check, AlertCircle } from "lucide-react";
-import { fetchRedacoes, createRedacao, updateRedacaoNota, type Redacao } from "../../lib/db";
-import { aiCorrigirRedacao, aiGerarTemaRedacao, type CorrecaoRedacao } from "../../lib/ai.service";
+import { useEffect, useState, useCallback } from 'react'
+import { PenLine, Send, RefreshCw, FileText, Award } from 'lucide-react'
+import {
+  fetchRedacoes,
+  insertRedacao,
+  updateRedacaoCorrecao,
+  fetchLancamentos,
+  insertLancamento,
+} from '../../lib/db'
+import type { Redacao } from '../../lib/types'
+import { callAiFunction, slugForKind } from '../../lib/ai-client'
 
-export function RedacaoView() {
-  const [redacoes, setRedacoes] = useState<Redacao[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [tema, setTema] = useState("");
-  const [conteudo, setConteudo] = useState("");
-  const [corrigindo, setCorrigindo] = useState(false);
-  const [correcao, setCorrecao] = useState<CorrecaoRedacao | null>(null);
-  const [gerandoTema, setGerandoTema] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function RedacaoView() {
+  const [redacoes, setRedacoes] = useState<Redacao[]>([])
+  const [tema, setTema] = useState('')
+  const [texto, setTexto] = useState('')
+  const [correcao, setCorrecao] = useState<Redacao | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [gerandoTema, setGerandoTema] = useState(false)
+  const [corrigindo, setCorrigindo] = useState(false)
+  const [redacaoSalvaId, setRedacaoSalvaId] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try { setRedacoes(await fetchRedacoes()); } catch { /* ignore */ }
-    setLoading(false);
-  }, []);
+  const loadData = useCallback(async () => {
+    const r = await fetchRedacoes()
+    setRedacoes(r)
+    if (r.length > 0 && !tema) {
+      setTema(r[0].tema)
+    }
+    setLoading(false)
+  }, [tema])
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
-  const handleGerarTema = async () => {
-    setGerandoTema(true);
-    setError(null);
-    try { setTema(await aiGerarTemaRedacao()); } catch (err) { setError((err as Error).message); }
-    setGerandoTema(false);
-  };
-
-  const handleCorrigir = async () => {
-    if (!tema || !conteudo) return;
-    setCorrigindo(true);
-    setError(null);
+  async function gerarTema() {
+    setGerandoTema(true)
     try {
-      const r = await createRedacao(tema, conteudo);
-      const c = await aiCorrigirRedacao(tema, conteudo);
-      setCorrecao(c);
-      if (r) await updateRedacaoNota(r.id, c.nota, JSON.stringify(c));
-      load();
-    } catch (err) { setError((err as Error).message); }
-    setCorrigindo(false);
-  };
+      const result = await callAiFunction(slugForKind('redacao-tema'), {
+        disciplina_id: 'redacao',
+      })
+      const novoTema =
+        (result.tema as string) ??
+        (result.titulo as string) ??
+        'Tema dissertativo-argumentativo sobre questão de segurança pública'
+      setTema(novoTema)
+      setTexto('')
+      setCorrecao(null)
+      setRedacaoSalvaId(null)
+    } finally {
+      setGerandoTema(false)
+    }
+  }
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
+  async function enviarCorrecao() {
+    if (!texto.trim()) return
+    setCorrigindo(true)
+    try {
+      let redId = redacaoSalvaId
+      if (!redId) {
+        const saved = await insertRedacao(tema, texto)
+        redId = saved?.id ?? null
+        setRedacaoSalvaId(redId)
+      }
+      const result = await callAiFunction(slugForKind('redacao-correcao'), {
+        disciplina_id: 'redacao',
+        tema,
+        texto,
+      })
+      const nota =
+        (result.nota as number) ??
+        (result.nota_total as number) ??
+        0
+      const feedback = (result.feedback as Record<string, unknown>) ?? result
+      if (redId) {
+        await updateRedacaoCorrecao(redId, nota, feedback)
+        const r = await fetchRedacoes()
+        setRedacoes(r)
+        const updated = r.find((x) => x.id === redId) ?? null
+        setCorrecao(updated)
+      }
+      if (nota > 0) {
+        await insertLancamento({
+          disciplina_id: 'redacao',
+          topico_id: null,
+          mastery: nota * 10,
+          minutos: 0,
+          is_primeiro_contato: false,
+        })
+      }
+    } finally {
+      setCorrigindo(false)
+    }
+  }
+
+  if (loading) {
+    return <div className="loading-spinner">Carregando redação...</div>
+  }
 
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100 flex items-center gap-2"><PenTool className="w-7 h-7 text-brand-600" />Redação</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Treine redações com correção por IA.</p></div>
+    <div className="view-container">
+      <div className="view-header">
+        <h1 className="view-title">Redação</h1>
+        <p className="view-subtitle">
+          Treine redações dissertativo-argumentativas com tema gerado por IA e
+          correção por critérios.
+        </p>
+      </div>
 
-      {error && <div className="card p-4 text-sm text-error-600 dark:text-error-400 flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
-
-      <div className="card p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex-1"><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Tema</label><input type="text" value={tema} onChange={(e) => setTema(e.target.value)} className="input-base" placeholder="Digite ou gere um tema..." /></div>
-          <button onClick={handleGerarTema} disabled={gerandoTema} className="btn-secondary ml-3 mt-6 flex items-center gap-2 shrink-0">{gerandoTema ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}Gerar tema</button>
+      <div className="card" style={{ marginBottom: 20 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 12,
+          }}
+        >
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>Tema atual</h3>
+          <button
+            className="btn btn-ghost btn-sm"
+            disabled={gerandoTema}
+            onClick={gerarTema}
+          >
+            {gerandoTema ? (
+              <RefreshCw size={14} className="spin" />
+            ) : (
+              <RefreshCw size={14} />
+            )}
+            Gerar novo tema
+          </button>
         </div>
-        <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Sua redação</label><textarea value={conteudo} onChange={(e) => setConteudo(e.target.value)} className="input-base resize-none" rows={12} placeholder="Escreva sua redação aqui..." /></div>
-        <button onClick={handleCorrigir} disabled={corrigindo || !tema || !conteudo} className="btn-primary flex items-center gap-2">{corrigindo ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}Corrigir com IA</button>
+        <div
+          style={{
+            background: 'var(--bg-elevated)',
+            borderRadius: 'var(--radius-sm)',
+            padding: 16,
+            fontSize: 15,
+            lineHeight: 1.6,
+            border: '1px solid var(--border)',
+          }}
+        >
+          {tema || 'Clique em "Gerar novo tema" para começar.'}
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
+          Sua redação
+        </h3>
+        <textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          placeholder="Escreva sua redação dissertativo-argumentativa aqui..."
+          style={{
+            width: '100%',
+            minHeight: 300,
+            background: 'var(--bg-elevated)',
+            border: '1px solid var(--border)',
+            borderRadius: 'var(--radius-sm)',
+            padding: 16,
+            fontSize: 15,
+            lineHeight: 1.7,
+            resize: 'vertical',
+            outline: 'none',
+          }}
+        />
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginTop: 12,
+          }}
+        >
+          <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+            {texto.length} caracteres
+          </span>
+          <button
+            className="btn btn-primary"
+            disabled={!texto.trim() || corrigindo}
+            onClick={enviarCorrecao}
+          >
+            {corrigindo ? (
+              <RefreshCw size={16} className="spin" />
+            ) : (
+              <Send size={16} />
+            )}
+            Enviar para correção
+          </button>
+        </div>
       </div>
 
       {correcao && (
-        <div className="card p-6 animate-slideUp space-y-4">
-          <div className="flex items-center gap-3"><Check className="w-6 h-6 text-success-500" /><h3 className="text-lg font-bold text-ink-900 dark:text-ink-100">Correção</h3><span className="ml-auto text-2xl font-bold text-brand-600">{correcao.nota.toFixed(1)}/10</span></div>
-          {correcao.criterios?.map((c, i) => (
-            <div key={i} className="p-3 rounded-lg bg-ink-50 dark:bg-ink-800/50">
-              <div className="flex items-center justify-between mb-1"><span className="text-sm font-medium text-ink-800 dark:text-ink-200">{c.nome}</span><span className="text-sm font-bold text-brand-600">{c.nota.toFixed(1)}</span></div>
-              <p className="text-xs text-ink-500 dark:text-ink-400">{c.comentario}</p>
+        <div className="card slide-up">
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <Award size={24} color="var(--warning)" />
+            <div>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>
+                Nota
+              </div>
+              <div style={{ fontSize: 28, fontWeight: 800 }}>
+                {correcao.nota != null
+                  ? Number(correcao.nota).toFixed(1)
+                  : '—'}
+                <span
+                  style={{
+                    fontSize: 16,
+                    color: 'var(--text-muted)',
+                    fontWeight: 400,
+                  }}
+                >
+                  /10
+                </span>
+              </div>
             </div>
-          ))}
-          <div className="p-3 rounded-lg bg-brand-50 dark:bg-brand-900/20"><p className="text-sm text-ink-700 dark:text-ink-300">{correcao.feedback}</p></div>
+          </div>
+
+          {correcao.feedback_json && (
+            <div style={{ marginTop: 16 }}>
+              <h4
+                style={{
+                  fontSize: 14,
+                  fontWeight: 600,
+                  marginBottom: 12,
+                  color: 'var(--text-secondary)',
+                }}
+              >
+                Feedback por critério
+              </h4>
+              {Object.entries(correcao.feedback_json).map(([key, val]) => (
+                <div
+                  key={key}
+                  style={{
+                    padding: '10px 0',
+                    borderBottom: '1px solid var(--border)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      textTransform: 'capitalize',
+                      marginBottom: 4,
+                    }}
+                  >
+                    {key.replace(/_/g, ' ')}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 14,
+                      color: 'var(--text-secondary)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {typeof val === 'object'
+                      ? JSON.stringify(val)
+                      : String(val)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {redacoes.length > 0 && (
-        <div className="card p-6">
-          <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4">Redações Anteriores</h3>
-          <div className="space-y-2">
-            {redacoes.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 p-3 rounded-lg bg-ink-50 dark:bg-ink-800/50">
-                <div className="flex-1 min-w-0"><p className="text-sm font-medium text-ink-800 dark:text-ink-200 truncate">{r.tema}</p><p className="text-xs text-ink-400">{new Date(r.criado_em).toLocaleDateString("pt-BR")}</p></div>
-                {r.nota != null && <span className="text-sm font-bold text-brand-600">{r.nota.toFixed(1)}/10</span>}
+        <div className="card" style={{ marginTop: 20 }}>
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+            Histórico de redações
+          </h3>
+          {redacoes.map((r) => (
+            <div
+              key={r.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 0',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              <div style={{ flex: 1, minWidth: 0, marginRight: 12 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 500,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  <FileText size={13} style={{ verticalAlign: 'middle', marginRight: 4 }} />
+                  {r.tema}
+                </div>
+                <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                  {new Date(r.criado_em).toLocaleDateString('pt-BR')}
+                </div>
               </div>
-            ))}
-          </div>
+              {r.nota != null && (
+                <span
+                  className="badge badge-primary"
+                  style={{ flexShrink: 0 }}
+                >
+                  {Number(r.nota).toFixed(1)}/10
+                </span>
+              )}
+            </div>
+          ))}
         </div>
       )}
     </div>
-  );
+  )
 }

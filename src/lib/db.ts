@@ -1,272 +1,290 @@
-import { supabase } from "./supabase";
+import { supabase } from './supabase'
+import type {
+  Discipline,
+  Topic,
+  Lancamento,
+  QuestaoLancamento,
+  SkipCount,
+  Flashcard,
+  Redacao,
+  AiMaterial,
+  StudyTimeDaily,
+  UserPrefs,
+  Profile,
+} from './types'
 
-// ─── Types ───
+const USER_ID = '00000000-0000-0000-0000-000000000000'
 
-export interface Disciplina {
-  id: string;
-  nome: string;
-  cor: string;
-  icon?: string;
-  topicos?: Topico[];
+export function getUserId(): string {
+  return USER_ID
 }
 
-export interface Topico {
-  id: string;
-  disciplina_id: string;
-  nome: string;
-  estudado: boolean;
-  ordem: number;
+export async function fetchDisciplines(): Promise<Discipline[]> {
+  const { data, error } = await supabase
+    .from('disciplines')
+    .select('*')
+    .order('ordem')
+  if (error) throw error
+  return data ?? []
 }
 
-export interface Flashcard {
-  id: string;
-  pergunta: string;
-  resposta: string;
-  disciplina_id?: string;
-  topico_id?: string;
-  caixa: number;
-  ultima_revisao: string | null;
-  proxima_revisao: string | null;
-  user_id?: string;
+export async function fetchTopics(disciplinaId?: string): Promise<Topic[]> {
+  let q = supabase.from('topics').select('*').order('ordem')
+  if (disciplinaId) q = q.eq('disciplina_id', disciplinaId)
+  const { data, error } = await q
+  if (error) throw error
+  return data ?? []
 }
 
-export interface Questao {
-  id: string;
-  enunciado: string;
-  alternativa_a: string;
-  alternativa_b: string;
-  alternativa_c: string;
-  alternativa_d: string;
-  alternativa_e: string;
-  resposta_correta: "A" | "B" | "C" | "D" | "E";
-  explicacao?: string;
-  disciplina_id?: string;
-  topico_id?: string;
-  user_id?: string;
-  criado_em: string;
+export async function fetchAllTopics(): Promise<Topic[]> {
+  return fetchTopics()
 }
 
-export interface QuestaoLancamento {
-  id: string;
-  questao_id: string;
-  resposta_usuario: "A" | "B" | "C" | "D" | "E";
-  correta: boolean;
-  criado_em: string;
+export async function fetchLancamentos(): Promise<Lancamento[]> {
+  const { data, error } = await supabase
+    .from('lancamentos')
+    .select('*')
+    .order('criado_em', { ascending: false })
+  if (error) throw error
+  return data ?? []
 }
 
-export interface Lancamento {
-  id: string;
-  tipo: "estudo" | "questao" | "simulado" | "redacao";
-  disciplina_id?: string;
-  topico_id?: string;
-  duracao_minutos: number;
-  acertos?: number;
-  erros?: number;
-  criado_em: string;
-  user_id?: string;
+export async function insertLancamento(
+  payload: Omit<Lancamento, 'id' | 'criado_em' | 'user_id'>,
+): Promise<void> {
+  const { error } = await supabase.from('lancamentos').insert({
+    ...payload,
+    user_id: USER_ID,
+  })
+  if (error) throw error
 }
 
-export interface Redacao {
-  id: string;
-  tema: string;
-  conteudo: string;
-  nota?: number;
-  correcao_ia?: string;
-  criado_em: string;
-  user_id?: string;
+export async function fetchQuestaoLancamentos(): Promise<QuestaoLancamento[]> {
+  const { data, error } = await supabase
+    .from('questao_lancamentos')
+    .select('*')
+    .order('criado_em', { ascending: false })
+  if (error) throw error
+  return data ?? []
 }
 
-export interface Perfil {
-  id?: string;
-  user_id?: string;
-  apelido?: string;
-  nome_completo?: string;
-  data_nascimento?: string;
-  avatar_url?: string;
-  cidade?: string;
-  estado?: string;
-  biografia?: string;
-  objetivo_estudos?: string;
-  profissao?: string;
-  email?: string;
-  criado_em?: string;
+export async function insertQuestaoLancamento(
+  payload: Omit<QuestaoLancamento, 'id' | 'criado_em' | 'user_id'>,
+): Promise<void> {
+  const { error } = await supabase.from('questao_lancamentos').insert({
+    ...payload,
+    user_id: USER_ID,
+  })
+  if (error) throw error
 }
 
-export interface RankingRow {
-  user_id: string;
-  nome: string;
-  xp_total: number;
-  taxa_acertos: number;
-  questoes_respondidas: number;
-  questoes_corretas: number;
-  topicos_estudados: number;
-  horas_estudadas: number;
-  dias_consecutivos: number;
-  percentual_edital: number;
-  patente: string;
-  patente_level: number;
-  ultima_atividade: string | null;
+export async function fetchSkipCounts(): Promise<SkipCount[]> {
+  const { data, error } = await supabase.from('skip_counts').select('*')
+  if (error) throw error
+  return data ?? []
 }
 
-export interface UserEvolutionRow {
-  data: string;
-  xp_gained: number;
-  xp_acumulado: number;
+export async function upsertSkipCount(
+  disciplinaId: string,
+  vezesPulada: number,
+  multiplicador: number,
+): Promise<void> {
+  const { error } = await supabase.from('skip_counts').upsert({
+    disciplina_id: disciplinaId,
+    vezes_pulada: vezesPulada,
+    multiplicador_urgencia: multiplicador,
+  })
+  if (error) throw error
 }
 
-export interface UserDisciplinaPerf {
-  disciplina_id: string;
-  disciplina_nome: string;
-  dominio: number;
-  questoes: number;
-  acertos: number;
+export async function resetSkipCount(disciplinaId: string): Promise<void> {
+  const { error } = await supabase.from('skip_counts').upsert({
+    disciplina_id: disciplinaId,
+    vezes_pulada: 0,
+    multiplicador_urgencia: 1,
+  })
+  if (error) throw error
 }
-
-// ─── Disciplinas & Tópicos ───
-
-export async function fetchDisciplinas(): Promise<Disciplina[]> {
-  const { data: disc, error: e1 } = await supabase.from("disciplinas").select("*").order("nome");
-  if (e1) throw e1;
-  const { data: tops, error: e2 } = await supabase.from("topicos").select("*").order("ordem");
-  if (e2) throw e2;
-  return (disc ?? []).map((d: Disciplina) => ({
-    ...d,
-    topicos: (tops ?? []).filter((t: Topico) => t.disciplina_id === d.id),
-  }));
-}
-
-export async function toggleTopicoEstudado(topicoId: string, estudado: boolean): Promise<void> {
-  const { error } = await supabase.from("topicos").update({ estudado }).eq("id", topicoId);
-  if (error) throw error;
-}
-
-// ─── Flashcards ───
 
 export async function fetchFlashcards(): Promise<Flashcard[]> {
-  const { data, error } = await supabase.from("flashcards").select("*").order("criado_em", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  const { data, error } = await supabase
+    .from('flashcards')
+    .select('*')
+    .order('proxima_revisao', { ascending: true })
+  if (error) throw error
+  return data ?? []
 }
 
-export async function createFlashcard(fc: Omit<Flashcard, "id" | "criado_em" | "ultima_revisao" | "proxima_revisao" | "caixa">): Promise<void> {
-  const { error } = await supabase.from("flashcards").insert({ ...fc, caixa: 1, ultima_revisao: null, proxima_revisao: new Date().toISOString() });
-  if (error) throw error;
+export async function insertFlashcards(
+  cards: Array<
+    Omit<Flashcard, 'id' | 'criado_em' | 'user_id' | 'caixa' | 'proxima_revisao'>
+  >,
+): Promise<void> {
+  const today = new Date()
+  const rows = cards.map((c) => ({
+    ...c,
+    user_id: USER_ID,
+    caixa: 1,
+    proxima_revisao: today.toISOString().slice(0, 10),
+  }))
+  const { error } = await supabase.from('flashcards').insert(rows)
+  if (error) throw error
 }
 
-export async function reviewFlashcard(id: string, acertou: boolean): Promise<void> {
-  const { data, error } = await supabase.from("flashcards").select("caixa").eq("id", id).maybeSingle();
-  if (error) throw error;
-  const caixa = data?.caixa ?? 1;
-  const novaCaixa = acertou ? Math.min(caixa + 1, 5) : 1;
-  const dias = [1, 2, 4, 8, 16][novaCaixa - 1] ?? 1;
-  const proxima = new Date();
-  proxima.setDate(proxima.getDate() + dias);
-  const { error: u } = await supabase.from("flashcards").update({ caixa: novaCaixa, ultima_revisao: new Date().toISOString(), proxima_revisao: proxima.toISOString() }).eq("id", id);
-  if (u) throw u;
+export async function updateFlashcardBox(
+  id: string,
+  caixa: number,
+  proximaRevisao: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('flashcards')
+    .update({ caixa, proxima_revisao: proximaRevisao })
+    .eq('id', id)
+  if (error) throw error
 }
 
-// ─── Questões ───
-
-export async function fetchQuestoes(limit = 20): Promise<Questao[]> {
-  const { data, error } = await supabase.from("questoes").select("*").order("criado_em", { ascending: false }).limit(limit);
-  if (error) throw error;
-  return data ?? [];
+export async function deleteFlashcardsForTopic(topicoId: string): Promise<void> {
+  const { error } = await supabase
+    .from('flashcards')
+    .delete()
+    .eq('topico_id', topicoId)
+  if (error) throw error
 }
-
-export async function registrarRespostaQuestao(questaoId: string, resposta: "A" | "B" | "C" | "D" | "E", correta: boolean): Promise<void> {
-  const { error } = await supabase.from("questao_lancamentos").insert({ questao_id: questaoId, resposta_usuario: resposta, correta });
-  if (error) throw error;
-}
-
-// ─── Lancamentos ───
-
-export async function fetchLancamentos(limit = 50): Promise<Lancamento[]> {
-  const { data, error } = await supabase.from("lancamentos").select("*").order("criado_em", { ascending: false }).limit(limit);
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function createLancamento(l: Omit<Lancamento, "id" | "criado_em">): Promise<void> {
-  const { error } = await supabase.from("lancamentos").insert({ ...l, criado_em: new Date().toISOString() });
-  if (error) throw error;
-}
-
-// ─── Redações ───
 
 export async function fetchRedacoes(): Promise<Redacao[]> {
-  const { data, error } = await supabase.from("redacoes").select("*").order("criado_em", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  const { data, error } = await supabase
+    .from('redacoes')
+    .select('*')
+    .order('criado_em', { ascending: false })
+  if (error) throw error
+  return data ?? []
 }
 
-export async function createRedacao(tema: string, conteudo: string): Promise<Redacao | null> {
-  const { data, error } = await supabase.from("redacoes").insert({ tema, conteudo, criado_em: new Date().toISOString() }).select().maybeSingle();
-  if (error) throw error;
-  return data;
+export async function insertRedacao(
+  tema: string,
+  texto: string,
+): Promise<Redacao | null> {
+  const { data, error } = await supabase
+    .from('redacoes')
+    .insert({ tema, texto, user_id: USER_ID })
+    .select('*')
+    .single()
+  if (error) throw error
+  return data
 }
 
-export async function updateRedacaoNota(id: string, nota: number, correcaoIa: string): Promise<void> {
-  const { error } = await supabase.from("redacoes").update({ nota, correcao_ia: correcaoIa }).eq("id", id);
-  if (error) throw error;
+export async function updateRedacaoCorrecao(
+  id: string,
+  nota: number,
+  feedbackJson: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await supabase
+    .from('redacoes')
+    .update({ nota, feedback_json: feedbackJson })
+    .eq('id', id)
+  if (error) throw error
 }
 
-// ─── Perfil ───
-
-export async function fetchPerfil(userId: string): Promise<Perfil | null> {
-  const { data, error } = await supabase.from("perfis").select("*").eq("user_id", userId).maybeSingle();
-  if (error) throw error;
-  if (data) return data;
-  // Create default profile if none exists
-  const { data: created, error: ce } = await supabase.from("perfis").insert({ user_id: userId }).select().maybeSingle();
-  if (ce) throw ce;
-  return created;
+export async function fetchAiMaterial(
+  disciplinaId: string,
+  topicoId: string | null,
+  kind: string,
+): Promise<AiMaterial | null> {
+  let q = supabase
+    .from('ai_material')
+    .select('*')
+    .eq('disciplina_id', disciplinaId)
+    .eq('kind', kind)
+  if (topicoId) q = q.eq('topico_id', topicoId)
+  else q = q.is('topico_id', null)
+  const { data, error } = await q.order('criado_em', { ascending: false }).limit(1)
+  if (error) throw error
+  return data && data.length > 0 ? data[0] : null
 }
 
-export async function updatePerfil(userId: string, updates: Partial<Record<string, string | null>>): Promise<void> {
-  const { error } = await supabase.from("perfis").update(updates).eq("user_id", userId);
-  if (error) throw error;
+export async function upsertAiMaterial(
+  disciplinaId: string,
+  topicoId: string | null,
+  kind: string,
+  contentJson: Record<string, unknown>,
+): Promise<void> {
+  const { error } = await supabase.from('ai_material').insert({
+    disciplina_id: disciplinaId,
+    topico_id: topicoId,
+    kind,
+    content_json: contentJson,
+  })
+  if (error) throw error
 }
 
-// ─── Ranking ───
-
-export async function fetchRanking(period: "all" | "week" | "month" | "year" = "all"): Promise<RankingRow[]> {
-  const { data, error } = await supabase.rpc("get_ranking", { p_period: period });
-  if (error) throw error;
-  return (data ?? []) as RankingRow[];
+export async function fetchStudyTimeDaily(): Promise<StudyTimeDaily[]> {
+  const { data, error } = await supabase
+    .from('study_time_daily')
+    .select('*')
+    .order('data', { ascending: false })
+  if (error) throw error
+  return data ?? []
 }
 
-export async function fetchUserEvolution(userId: string, days = 30): Promise<UserEvolutionRow[]> {
-  const { data, error } = await supabase.rpc("get_user_evolution", { p_uid: userId, p_days: days });
-  if (error) throw error;
-  return (data ?? []) as UserEvolutionRow[];
+export async function upsertStudyTime(
+  data: string,
+  tempoSegundos: number,
+): Promise<void> {
+  const { error } = await supabase
+    .from('study_time_daily')
+    .upsert(
+      { user_id: USER_ID, data, tempo_segundos: tempoSegundos },
+      { onConflict: 'user_id,data' },
+    )
+  if (error) throw error
 }
 
-export async function fetchUserDisciplinasPerformance(userId: string): Promise<UserDisciplinaPerf[]> {
-  const { data, error } = await supabase.rpc("get_user_disciplinas_performance", { p_uid: userId });
-  if (error) throw error;
-  return (data ?? []) as UserDisciplinaPerf[];
+export async function fetchUserPrefs(): Promise<UserPrefs | null> {
+  const { data, error } = await supabase
+    .from('user_prefs')
+    .select('*')
+    .eq('id', 1)
+    .maybeSingle()
+  if (error) throw error
+  return data
 }
 
-// ─── Study time ───
+export async function upsertUserPrefs(
+  prefs: Partial<Omit<UserPrefs, 'id'>>,
+): Promise<void> {
+  const { error } = await supabase
+    .from('user_prefs')
+    .upsert({ id: 1, ...prefs })
+  if (error) throw error
+}
 
-export async function recordStudyTime(disciplinaId: string | null, topicoId: string | null, minutos: number): Promise<void> {
-  const today = new Date().toISOString().split("T")[0];
-  const { data: existing, error: fe } = await supabase
-    .from("study_time_daily")
-    .select("*")
-    .eq("data", today)
-    .maybeSingle();
-  if (fe) throw fe;
+export async function fetchProfile(): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .limit(1)
+    .maybeSingle()
+  if (error) throw error
+  return data
+}
+
+export async function upsertProfile(
+  profile: Partial<Omit<Profile, 'id' | 'criado_em'>> & { id?: string },
+): Promise<void> {
+  const existing = await fetchProfile()
   if (existing) {
     const { error } = await supabase
-      .from("study_time_daily")
-      .update({ minutos: (existing.minutos ?? 0) + minutos })
-      .eq("id", existing.id);
-    if (error) throw error;
+      .from('profiles')
+      .update(profile)
+      .eq('id', existing.id)
+    if (error) throw error
   } else {
-    const { error } = await supabase
-      .from("study_time_daily")
-      .insert({ data: today, minutos, disciplina_id: disciplinaId, topico_id: topicoId });
-    if (error) throw error;
+    const { error } = await supabase.from('profiles').insert({
+      nome: profile.nome ?? 'Concurseiro',
+      email: profile.email ?? '',
+      ...profile,
+      user_id: USER_ID,
+    })
+    if (error) throw error
   }
 }

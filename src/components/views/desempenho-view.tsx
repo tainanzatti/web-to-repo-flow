@@ -1,99 +1,264 @@
-import { useEffect, useState, useCallback } from "react";
-import { BarChart3, Loader2, Sparkles, AlertCircle, TrendingUp, Star, Target } from "lucide-react";
-import { useAuth } from "../../lib/auth-context";
-import { fetchRanking, fetchLancamentos, type RankingRow, type Lancamento } from "../../lib/db";
-import { aiAnaliseDesempenho, aiRecomendacoes, type AnaliseDesempenho } from "../../lib/ai.service";
+import { useEffect, useState, useMemo } from 'react'
+import { TrendingUp, AlertTriangle, SkipForward } from 'lucide-react'
+import {
+  fetchDisciplines,
+  fetchAllTopics,
+  fetchLancamentos,
+  fetchSkipCounts,
+  fetchQuestaoLancamentos,
+} from '../../lib/db'
+import type {
+  Discipline,
+  Topic,
+  Lancamento,
+  SkipCount,
+  QuestaoLancamento,
+} from '../../lib/types'
+import { computeDisciplineMastery } from '../../lib/curriculum'
 
-export function DesempenhoView() {
-  const { user } = useAuth();
-  const [ranking, setRanking] = useState<RankingRow | null>(null);
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [analise, setAnalise] = useState<AnaliseDesempenho | null>(null);
-  const [recomendacoes, setRecomendacoes] = useState<string[]>([]);
-  const [loadingAI, setLoadingAI] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export default function DesempenhoView() {
+  const [disciplines, setDisciplines] = useState<Discipline[]>([])
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [skipCounts, setSkipCounts] = useState<SkipCount[]>([])
+  const [questoes, setQuestoes] = useState<QuestaoLancamento[]>([])
+  const [loading, setLoading] = useState(true)
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const [rows, lans] = await Promise.all([
-        fetchRanking("all").then((r) => r.find((x) => x.user_id === user.id) ?? null).catch(() => null),
-        fetchLancamentos(100).catch(() => []),
-      ]);
-      setRanking(rows);
-      setLancamentos(lans);
-    } catch { /* ignore */ }
-    setLoading(false);
-  }, [user]);
+  useEffect(() => {
+    Promise.all([
+      fetchDisciplines(),
+      fetchAllTopics(),
+      fetchLancamentos(),
+      fetchSkipCounts(),
+      fetchQuestaoLancamentos(),
+    ]).then(([d, t, l, s, q]) => {
+      setDisciplines(d)
+      setTopics(t)
+      setLancamentos(l)
+      setSkipCounts(s)
+      setQuestoes(q)
+      setLoading(false)
+    })
+  }, [])
 
-  useEffect(() => { load(); }, [load]);
+  const rows = useMemo(() => {
+    return disciplines.map((d) => {
+      const dm = computeDisciplineMastery(d, topics, lancamentos)
+      const skip = skipCounts.find((s) => s.disciplina_id === d.id)
+      const discQuestoes = questoes.filter(
+        (q) => q.disciplina_id === d.id,
+      )
+      const totalQ = discQuestoes.reduce((s, q) => s + q.quantidade, 0)
+      const acertosQ = discQuestoes.reduce((s, q) => s + q.acertos, 0)
+      const apr = totalQ > 0 ? Math.round((acertosQ / totalQ) * 100) : 0
+      return {
+        discipline: d,
+        masteryMedio: dm.masteryMedio,
+        topicsTotal: dm.topics.length,
+        topicsNaoIniciados: dm.topicsNaoIniciados,
+        topicsDominados: dm.topicsDominados,
+        topicsResurgir: dm.topicsResurgir.length,
+        vezesPulada: skip?.vezes_pulada ?? 0,
+        multiplicador: skip ? Number(skip.multiplicador_urgencia) : 1,
+        aproveitamento: apr,
+        totalQuestoes: totalQ,
+      }
+    })
+  }, [disciplines, topics, lancamentos, skipCounts, questoes])
 
-  const handleAnalise = async () => {
-    setLoadingAI(true); setError(null);
-    try {
-      const dados = {
-        xp_total: ranking?.xp_total ?? 0,
-        taxa_acertos: ranking?.taxa_acertos ?? 0,
-        questoes_respondidas: ranking?.questoes_respondidas ?? 0,
-        questoes_corretas: ranking?.questoes_corretas ?? 0,
-        horas_estudadas: ranking?.horas_estudadas ?? 0,
-        topicos_estudados: ranking?.topicos_estudados ?? 0,
-        dias_consecutivos: ranking?.dias_consecutivos ?? 0,
-        percentual_edital: ranking?.percentual_edital ?? 0,
-        lancamentos: lancamentos.slice(0, 20),
-      };
-      const [a, r] = await Promise.all([aiAnaliseDesempenho(dados), aiRecomendacoes(dados)]);
-      setAnalise(a);
-      setRecomendacoes(r);
-    } catch (err) { setError((err as Error).message); }
-    setLoadingAI(false);
-  };
-
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
+  if (loading) {
+    return <div className="loading-spinner">Carregando desempenho...</div>
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100 flex items-center gap-2"><BarChart3 className="w-7 h-7 text-brand-600" />Desempenho</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Analise seu progresso com IA.</p></div>
-        <button onClick={handleAnalise} disabled={loadingAI} className="btn-primary flex items-center gap-2">{loadingAI ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}Analisar com IA</button>
+    <div className="view-container">
+      <div className="view-header">
+        <h1 className="view-title">Desempenho</h1>
+        <p className="view-subtitle">
+          Visão detalhada por disciplina, incluindo evasão e tópicos que
+          precisam de ressurgeência.
+        </p>
       </div>
 
-      {error && <div className="card p-4 text-sm text-error-600 dark:text-error-400 flex items-center gap-2"><AlertCircle className="w-4 h-4" />{error}</div>}
-
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={<Target className="w-5 h-5" />} label="XP" value={String(ranking?.xp_total ?? 0)} color="brand" />
-        <StatCard icon={<Target className="w-5 h-5" />} label="Acertos" value={`${(ranking?.taxa_acertos ?? 0).toFixed(0)}%`} color="success" />
-        <StatCard icon={<BarChart3 className="w-5 h-5" />} label="Questões" value={String(ranking?.questoes_respondidas ?? 0)} color="warning" />
-        <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Horas" value={`${(ranking?.horas_estudadas ?? 0).toFixed(1)}h`} color="ink" />
-        <StatCard icon={<Star className="w-5 h-5" />} label="Tópicos" value={String(ranking?.topicos_estudados ?? 0)} color="brand" />
-        <StatCard icon={<Target className="w-5 h-5" />} label="% Edital" value={`${(ranking?.percentual_edital ?? 0).toFixed(0)}%`} color="error" />
+      <div className="card" style={{ overflowX: 'auto', padding: 0 }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr style={{ borderBottom: '2px solid var(--border)' }}>
+              <Th>Disciplina</Th>
+              <Th>Domínio</Th>
+              <Th>Tópicos</Th>
+              <Th>Não iniciados</Th>
+              <Th>Dominados</Th>
+              <Th>Resurgir</Th>
+              <Th>Questões</Th>
+              <Th>Aprov.</Th>
+              <Th>
+                <SkipForward size={14} style={{ verticalAlign: 'middle' }} />
+                {' '}Pulos
+              </Th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
+              <tr
+                key={r.discipline.id}
+                style={{ borderBottom: '1px solid var(--border)' }}
+              >
+                <Td>
+                  <span style={{ fontWeight: 600 }}>{r.discipline.nome}</span>
+                  <span
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--text-muted)',
+                      marginLeft: 6,
+                    }}
+                  >
+                    peso {r.discipline.peso_edital}
+                  </span>
+                </Td>
+                <Td>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: 50,
+                        height: 6,
+                        borderRadius: 3,
+                        background: 'var(--neutral-700)',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <div
+                        className={`mastery-bar-fill ${
+                          r.masteryMedio < 40
+                            ? 'low'
+                            : r.masteryMedio < 70
+                              ? 'mid'
+                              : 'high'
+                        }`}
+                        style={{
+                          width: `${r.masteryMedio}%`,
+                          height: '100%',
+                        }}
+                      />
+                    </div>
+                    <span style={{ fontSize: 13, fontWeight: 600 }}>
+                      {Math.round(r.masteryMedio)}%
+                    </span>
+                  </div>
+                </Td>
+                <Td>{r.topicsTotal}</Td>
+                <Td>
+                  {r.topicsNaoIniciados > 0 ? (
+                    <span className="badge badge-error">
+                      {r.topicsNaoIniciados}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>0</span>
+                  )}
+                </Td>
+                <Td>
+                  {r.topicsDominados > 0 ? (
+                    <span className="badge badge-success">
+                      {r.topicsDominados}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>0</span>
+                  )}
+                </Td>
+                <Td>
+                  {r.topicsResurgir > 0 ? (
+                    <span
+                      className="badge badge-warning"
+                      style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}
+                    >
+                      <AlertTriangle size={11} />
+                      {r.topicsResurgir}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>0</span>
+                  )}
+                </Td>
+                <Td>{r.totalQuestoes}</Td>
+                <Td>
+                  {r.totalQuestoes > 0 ? (
+                    <span
+                      style={{
+                        color:
+                          r.aproveitamento >= 60
+                            ? 'var(--success-light)'
+                            : 'var(--warning-light)',
+                        fontWeight: 600,
+                      }}
+                    >
+                      {r.aproveitamento}%
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>—</span>
+                  )}
+                </Td>
+                <Td>
+                  {r.vezesPulada > 0 ? (
+                    <span
+                      className="badge badge-error"
+                      title={`Multiplicador de urgência: ×${r.multiplicador.toFixed(1)}`}
+                    >
+                      {r.vezesPulada}x
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--text-muted)' }}>0</span>
+                  )}
+                </Td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
-      {analise && (
-        <div className="space-y-4 animate-slideUp">
-          <div className="card p-6"><h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-2">Resumo</h3><p className="text-sm text-ink-700 dark:text-ink-300">{analise.resumo}</p></div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="card p-6"><h3 className="text-sm font-bold text-success-600 dark:text-success-400 mb-3 flex items-center gap-2"><Star className="w-4 h-4" />Pontos Fortes</h3><ul className="space-y-2">{analise.pontos_fortes.map((p, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><CheckMini /> {p}</li>)}</ul></div>
-            <div className="card p-6"><h3 className="text-sm font-bold text-error-600 dark:text-error-400 mb-3 flex items-center gap-2"><TrendingUp className="w-4 h-4" />Pontos Fracos</h3><ul className="space-y-2">{analise.pontos_fracos.map((p, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><AlertMini /> {p}</li>)}</ul></div>
-          </div>
-          {analise.sugestoes.length > 0 && (
-            <div className="card p-6"><h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-3">Sugestões</h3><ul className="space-y-2">{analise.sugestoes.map((s, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><Sparkles className="w-4 h-4 text-brand-500 shrink-0 mt-0.5" /> {s}</li>)}</ul></div>
-          )}
+      <div
+        className="card"
+        style={{ marginTop: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}
+      >
+        <TrendingUp size={20} color="var(--primary-light)" style={{ flexShrink: 0, marginTop: 2 }} />
+        <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
+          <strong style={{ color: 'var(--text)' }}>Resurgimento espaçado:</strong>{' '}
+          tópicos dominados há mais de 25 dias sem revisão voltam à fila como
+          teste de manutenção (5-10 min). Indicados pelo ícone de alerta na coluna
+          "Resurgir".
         </div>
-      )}
-
-      {recomendacoes.length > 0 && (
-        <div className="card p-6 animate-slideUp"><h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-3 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand-500" />Recomendações Personalizadas</h3><ul className="space-y-2">{recomendacoes.map((r, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><span className="w-5 h-5 rounded-full bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span> {r}</li>)}</ul></div>
-      )}
+      </div>
     </div>
-  );
+  )
 }
 
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
-  const cm: Record<string, string> = { brand: "bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300", success: "bg-success-50 text-success-600 dark:bg-success-900/30 dark:text-success-300", warning: "bg-warning-50 text-warning-600 dark:bg-warning-900/30 dark:text-warning-300", ink: "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300", error: "bg-error-50 text-error-600 dark:bg-error-900/30 dark:text-error-300" };
-  return <div className="card p-3"><div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${cm[color] ?? cm.brand}`}>{icon}</div><p className="text-lg font-bold text-ink-900 dark:text-ink-100">{value}</p><p className="text-xs text-ink-500 dark:text-ink-400">{label}</p></div>;
+function Th({ children }: { children: React.ReactNode }) {
+  return (
+    <th
+      style={{
+        padding: '12px 16px',
+        textAlign: 'left',
+        fontSize: 12,
+        fontWeight: 600,
+        color: 'var(--text-muted)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.05em',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </th>
+  )
 }
-function CheckMini() { return <svg className="w-4 h-4 text-success-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M20 6L9 17l-5-5" /></svg>; }
-function AlertMini() { return <svg className="w-4 h-4 text-error-500 shrink-0 mt-0.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10" /><path d="M12 8v4M12 16h.01" /></svg>; }
+
+function Td({ children }: { children: React.ReactNode }) {
+  return (
+    <td style={{ padding: '12px 16px', fontSize: 14, whiteSpace: 'nowrap' }}>
+      {children}
+    </td>
+  )
+}

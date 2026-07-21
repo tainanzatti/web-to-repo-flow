@@ -1,89 +1,478 @@
-import { useEffect, useState, useCallback } from "react";
-import { LayoutDashboard, Zap, Flame, BookOpen, Clock, Target, Loader2, TrendingUp } from "lucide-react";
-import { useAuth } from "../../lib/auth-context";
-import { fetchRanking, fetchLancamentos, type RankingRow, type Lancamento } from "../../lib/db";
-import { LineChart } from "../ui/Charts";
+import { useEffect, useState, useMemo } from 'react'
+import {
+  Clock,
+  Target,
+  TrendingUp,
+  BookOpen,
+  Layers,
+  Calendar,
+  ArrowRight,
+  Info,
+} from 'lucide-react'
+import {
+  fetchDisciplines,
+  fetchAllTopics,
+  fetchLancamentos,
+  fetchSkipCounts,
+  fetchStudyTimeDaily,
+  fetchQuestaoLancamentos,
+  fetchFlashcards,
+  fetchProfile,
+  insertLancamento,
+} from '../../lib/db'
+import type {
+  Discipline,
+  Topic,
+  Lancamento,
+  SkipCount,
+  StudyTimeDaily,
+  QuestaoLancamento,
+  Flashcard,
+  Profile,
+} from '../../lib/types'
+import {
+  computeAllScores,
+  computeDisciplineMastery,
+  type DisciplineScore,
+} from '../../lib/curriculum'
 
-export function PainelView() {
-  const { user } = useAuth();
-  const [ranking, setRanking] = useState<RankingRow | null>(null);
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
-  const [loading, setLoading] = useState(true);
+type Props = {
+  onNavigate: (v: 'nucleo' | 'flashcards') => void
+}
 
-  const load = useCallback(async () => {
-    if (!user) return;
-    setLoading(true);
-    try {
-      const [rows, lans] = await Promise.all([
-        fetchRanking("all").then((r) => r.find((x) => x.user_id === user.id) ?? null).catch(() => null),
-        fetchLancamentos(30).catch(() => []),
-      ]);
-      setRanking(rows);
-      setLancamentos(lans);
-    } catch { /* ignore */ }
-    setLoading(false);
-  }, [user]);
+export default function PainelView({ onNavigate }: Props) {
+  const [disciplines, setDisciplines] = useState<Discipline[]>([])
+  const [topics, setTopics] = useState<Topic[]>([])
+  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [skipCounts, setSkipCounts] = useState<SkipCount[]>([])
+  const [studyTime, setStudyTime] = useState<StudyTimeDaily[]>([])
+  const [questoes, setQuestoes] = useState<QuestaoLancamento[]>([])
+  const [flashcards, setFlashcards] = useState<Flashcard[]>([])
+  const [profile, setProfile] = useState<Profile | null>(null)
+  const [horasSlider, setHorasSlider] = useState(2)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    Promise.all([
+      fetchDisciplines(),
+      fetchAllTopics(),
+      fetchLancamentos(),
+      fetchSkipCounts(),
+      fetchStudyTimeDaily(),
+      fetchQuestaoLancamentos(),
+      fetchFlashcards(),
+      fetchProfile(),
+    ]).then(
+      ([
+        d,
+        t,
+        l,
+        s,
+        st,
+        q,
+        f,
+        p,
+      ]) => {
+        setDisciplines(d)
+        setTopics(t)
+        setLancamentos(l)
+        setSkipCounts(s)
+        setStudyTime(st)
+        setQuestoes(q)
+        setFlashcards(f)
+        setProfile(p)
+        setLoading(false)
+      },
+    )
+  }, [])
 
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
+  const scores = useMemo(
+    () => computeAllScores(disciplines, topics, lancamentos, skipCounts),
+    [disciplines, topics, lancamentos, skipCounts],
+  )
 
-  const displayName = user?.email?.split("@")[0] ?? "Usuário";
+  const today = new Date().toISOString().slice(0, 10)
+  const todayTime = studyTime.find((s) => s.data === today)
+  const todaySeconds = todayTime?.tempo_segundos ?? 0
+  const todayHours = todaySeconds / 3600
+
+  const totalSeconds = studyTime.reduce(
+    (s, d) => s + d.tempo_segundos,
+    0,
+  )
+  const totalHours = totalSeconds / 3600
+
+  const totalQuestoes = questoes.reduce((s, q) => s + q.quantidade, 0)
+  const totalAcertos = questoes.reduce((s, q) => s + q.acertos, 0)
+  const aproveitamento =
+    totalQuestoes > 0 ? Math.round((totalAcertos / totalQuestoes) * 100) : 0
+
+  const allMasteries = disciplines.map((d) =>
+    computeDisciplineMastery(d, topics, lancamentos),
+  )
+  const bomOuOtimo = allMasteries.filter((dm) => dm.masteryMedio >= 60).length
+  const pctBomOuOtimo =
+    disciplines.length > 0
+      ? Math.round((bomOuOtimo / disciplines.length) * 100)
+      : 0
+
+  const todayFlashcards = flashcards.filter(
+    (c) => c.proxima_revisao <= today,
+  ).length
+
+  const revisoesVencendo = useMemo(() => {
+    return allMasteries
+      .flatMap((dm) =>
+        dm.topics
+          .filter(
+            (tm) =>
+              !tm.isPrimeiroContato &&
+              tm.daysSinceReview !== null &&
+              tm.daysSinceReview >= 7,
+          )
+          .map((tm) => ({ dm, tm })),
+      )
+      .sort((a, b) => (b.tm.daysSinceReview ?? 0) - (a.tm.daysSinceReview ?? 0))
+      .slice(0, 5)
+  }, [allMasteries])
+
+  const topicosNaoTocados = useMemo(
+    () =>
+      allMasteries.reduce(
+        (s, dm) => s + dm.topicsNaoIniciados,
+        0,
+      ),
+    [allMasteries],
+  )
+
+  const ritmoMedio = useMemo(() => {
+    const ultimos30 = studyTime.slice(0, 30)
+    if (ultimos30.length === 0) return 0
+    const diasAtivos = ultimos30.filter((d) => d.tempo_segundos > 0).length
+    if (diasAtivos === 0) return 0
+    const mediaMinutos = ultimos30.reduce((s, d) => s + d.tempo_segundos, 0) / diasAtivos / 60
+    const minutosPorTopico = 30
+    return mediaMinutos / minutosPorTopico
+  }, [studyTime])
+
+  const diasParaCobrir = ritmoMedio > 0 ? Math.ceil(topicosNaoTocados / ritmoMedio) : 0
+
+  const minutosPorTopicoNovo = useMemo(() => {
+    const primeiroContato = lancamentos.filter((l) => l.is_primeiro_contato)
+    if (primeiroContato.length === 0) return 30
+    return Math.round(
+      primeiroContato.reduce((s, l) => s + l.minutos, 0) /
+        primeiroContato.length,
+    )
+  }, [lancamentos])
+
+  const diasHipoteticos =
+    ritmoMedio > 0
+      ? Math.ceil(
+          (topicosNaoTocados * minutosPorTopicoNovo) /
+            (horasSlider * 60) /
+            Math.max(ritmoMedio, 0.5),
+        )
+      : 0
+
+  const activeScore: DisciplineScore | undefined = scores[0]
+  const activeName = activeScore?.discipline.nome ?? ''
+  const activeMotivo = activeScore?.motivo ?? ''
+
+  if (loading) {
+    return <div className="loading-spinner">Carregando painel...</div>
+  }
+
+  const nome = profile?.nome ?? 'Concurseiro'
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100 flex items-center gap-2"><LayoutDashboard className="w-7 h-7 text-brand-600" />Painel</h1>
-        <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Bem-vindo de volta, {displayName}!</p>
+    <div className="view-container">
+      <div className="view-header">
+        <h1 className="view-title">Olá, {nome.split(' ')[0]}</h1>
+        <p className="view-subtitle">
+          {activeName
+            ? `${activeName} é a disciplina que mais precisa de você agora — ${activeMotivo}.`
+            : 'Comece estudando a disciplina ativa no Núcleo.'}
+        </p>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard icon={<Zap className="w-5 h-5" />} label="XP Total" value={String(ranking?.xp_total ?? 0)} color="brand" />
-        <StatCard icon={<Target className="w-5 h-5" />} label="Acertos" value={`${(ranking?.taxa_acertos ?? 0).toFixed(0)}%`} color="success" />
-        <StatCard icon={<BookOpen className="w-5 h-5" />} label="Questões" value={String(ranking?.questoes_respondidas ?? 0)} color="warning" />
-        <StatCard icon={<Clock className="w-5 h-5" />} label="Horas" value={`${(ranking?.horas_estudadas ?? 0).toFixed(1)}h`} color="ink" />
-        <StatCard icon={<Flame className="w-5 h-5" />} label="Streak" value={`${ranking?.dias_consecutivos ?? 0}d`} color="error" />
-        <StatCard icon={<TrendingUp className="w-5 h-5" />} label="% Edital" value={`${(ranking?.percentual_edital ?? 0).toFixed(0)}%`} color="brand" />
+      <div
+        className="grid"
+        style={{
+          gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+          marginBottom: 24,
+        }}
+      >
+        <StatCard
+          icon={Clock}
+          label="Horas hoje"
+          value={todayHours.toFixed(1) + 'h'}
+          color="var(--primary)"
+        />
+        <StatCard
+          icon={Clock}
+          label="Horas totais"
+          value={totalHours.toFixed(0) + 'h'}
+          color="var(--accent)"
+        />
+        <StatCard
+          icon={TrendingUp}
+          label="Aproveitamento"
+          value={aproveitamento + '%'}
+          color="var(--success)"
+        />
+        <StatCard
+          icon={Target}
+          label="Domínio bom/ótimo"
+          value={pctBomOuOtimo + '%'}
+          color="var(--warning)"
+        />
       </div>
 
-      <div className="card p-6">
-        <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4">Atividades Recentes</h3>
-        {lancamentos.length === 0 ? (
-          <p className="text-sm text-ink-400 text-center py-8">Nenhuma atividade registrada ainda.</p>
-        ) : (
-          <div className="space-y-2">
-            {lancamentos.slice(0, 10).map((l) => (
-              <div key={l.id} className="flex items-center gap-3 p-3 rounded-lg bg-ink-50 dark:bg-ink-800/50">
-                <div className="w-8 h-8 rounded-lg bg-brand-50 dark:bg-brand-900/30 flex items-center justify-center text-brand-600 dark:text-brand-400 shrink-0">
-                  {l.tipo === "estudo" ? <BookOpen className="w-4 h-4" /> : l.tipo === "questao" ? <Target className="w-4 h-4" /> : l.tipo === "redacao" ? <BookOpen className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-ink-800 dark:text-ink-200 capitalize">{l.tipo}</p>
-                  <p className="text-xs text-ink-400">{l.duracao_minutos} min · {new Date(l.criado_em).toLocaleDateString("pt-BR")}</p>
-                </div>
-                {l.acertos != null && <span className="text-xs font-medium text-success-600 dark:text-success-400">{l.acertos} acertos</span>}
-              </div>
-            ))}
+      <div className="grid" style={{ gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+        <div className="card">
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: 16,
+            }}
+          >
+            <h3 style={{ fontSize: 16, fontWeight: 700 }}>
+              Prévia do Núcleo
+            </h3>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => onNavigate('nucleo')}
+            >
+              Ver tudo <ArrowRight size={14} />
+            </button>
           </div>
+          {scores.slice(0, 4).map((s) => (
+            <div
+              key={s.discipline.id}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '10px 0',
+                borderBottom: '1px solid var(--border)',
+              }}
+            >
+              <span style={{ fontSize: 14, fontWeight: 500 }}>
+                {s.discipline.nome}
+              </span>
+              <div
+                style={{ display: 'flex', alignItems: 'center', gap: 10 }}
+              >
+                <div
+                  style={{
+                    width: 60,
+                    height: 6,
+                    borderRadius: 3,
+                    background: 'var(--neutral-700)',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    className={`mastery-bar-fill ${
+                      s.masteryMedio < 40 ? 'low' : s.masteryMedio < 70 ? 'mid' : 'high'
+                    }`}
+                    style={{ width: `${s.masteryMedio}%`, height: '100%' }}
+                  />
+                </div>
+                <span
+                  style={{
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: 'var(--text-secondary)',
+                    minWidth: 32,
+                    textAlign: 'right',
+                  }}
+                >
+                  {Math.round(s.masteryMedio)}%
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div className="card">
+          <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 16 }}>
+            Revisões vencendo
+          </h3>
+          {revisoesVencendo.length === 0 ? (
+            <p style={{ color: 'var(--text-muted)', fontSize: 14 }}>
+              Nenhuma revisão vencida. Tudo em dia!
+            </p>
+          ) : (
+            revisoesVencendo.map(({ dm, tm }) => (
+              <div
+                key={tm.topic.id}
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  padding: '8px 0',
+                  borderBottom: '1px solid var(--border)',
+                  fontSize: 13,
+                }}
+              >
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginRight: 8 }}>
+                  {tm.topic.nome}
+                </span>
+                <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>
+                  {tm.daysSinceReview}d
+                </span>
+              </div>
+            ))
+          )}
+          <div
+            style={{
+              marginTop: 16,
+              paddingTop: 16,
+              borderTop: '1px solid var(--border)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <Layers size={18} color="var(--primary-light)" />
+            <span style={{ fontSize: 14 }}>
+              {todayFlashcards} flashcard{todayFlashcards !== 1 ? 's' : ''} pendente
+              {todayFlashcards !== 1 ? 's' : ''} hoje
+            </span>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginLeft: 'auto' }}
+              onClick={() => onNavigate('flashcards')}
+            >
+              Ir <ArrowRight size={14} />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="card" style={{ marginTop: 20 }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            marginBottom: 16,
+          }}
+        >
+          <Calendar size={20} color="var(--accent)" />
+          <h3 style={{ fontSize: 16, fontWeight: 700 }}>
+            Projeção de cobertura
+          </h3>
+        </div>
+        {topicosNaoTocados > 0 ? (
+          <>
+            <p style={{ color: 'var(--text-secondary)', fontSize: 15, marginBottom: 20 }}>
+              No seu ritmo atual, você verá todos os {topicosNaoTocados} tópicos
+              restantes pela primeira vez em{' '}
+              <strong style={{ color: 'var(--text)' }}>
+                {diasParaCobrir > 0 ? `${diasParaCobrir} dias` : '—'}
+              </strong>
+              .
+            </p>
+
+            <div style={{ marginBottom: 16 }}>
+              <label
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--text-secondary)',
+                  marginBottom: 8,
+                  display: 'block',
+                }}
+              >
+                Calculadora: e se eu estudar {horasSlider}h por dia?
+              </label>
+              <input
+                type="range"
+                min={1}
+                max={8}
+                step={1}
+                value={horasSlider}
+                onChange={(e) => setHorasSlider(Number(e.target.value))}
+                style={{ width: '100%', accentColor: 'var(--primary)' }}
+              />
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  marginTop: 8,
+                  fontSize: 12,
+                  color: 'var(--text-muted)',
+                }}
+              >
+                <span>1h/dia</span>
+                <span>8h/dia</span>
+              </div>
+            </div>
+
+            {diasHipoteticos > 0 && (
+              <div
+                style={{
+                  background: 'var(--bg-elevated)',
+                  borderRadius: 'var(--radius-sm)',
+                  padding: 16,
+                  fontSize: 15,
+                }}
+              >
+                Nesse ritmo de <strong>{horasSlider}h/dia</strong>, levaria{' '}
+                <strong style={{ color: 'var(--primary-light)' }}>
+                  {diasHipoteticos} dias
+                </strong>{' '}
+                para cobrir todos os tópicos pela primeira vez.
+              </div>
+            )}
+
+            <div
+              style={{
+                marginTop: 16,
+                display: 'flex',
+                gap: 8,
+                alignItems: 'flex-start',
+                fontSize: 12,
+                color: 'var(--text-muted)',
+              }}
+            >
+              <Info size={14} style={{ flexShrink: 0, marginTop: 2 }} />
+              <span>
+                Estimativa baseada no seu ritmo médio real de estudo. Não
+                considera revisões, apenas o primeiro contato com cada tópico.
+              </span>
+            </div>
+          </>
+        ) : (
+          <p style={{ color: 'var(--success)', fontSize: 15 }}>
+            Você já tocou todos os tópicos pelo menos uma vez. Foque nas revisões!
+          </p>
         )}
       </div>
     </div>
-  );
+  )
 }
 
-function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
-  const cm: Record<string, string> = {
-    brand: "bg-brand-50 text-brand-600 dark:bg-brand-900/30 dark:text-brand-300",
-    success: "bg-success-50 text-success-600 dark:bg-success-900/30 dark:text-success-300",
-    warning: "bg-warning-50 text-warning-600 dark:bg-warning-900/30 dark:text-warning-300",
-    ink: "bg-ink-100 text-ink-600 dark:bg-ink-800 dark:text-ink-300",
-    error: "bg-error-50 text-error-600 dark:bg-error-900/30 dark:text-error-300",
-  };
+function StatCard({
+  icon: Icon,
+  label,
+  value,
+  color,
+}: {
+  icon: React.ComponentType<{ size?: number; color?: string }>
+  label: string
+  value: string
+  color: string
+}) {
   return (
-    <div className="card p-3">
-      <div className={`w-8 h-8 rounded-lg flex items-center justify-center mb-2 ${cm[color] ?? cm.brand}`}>{icon}</div>
-      <p className="text-lg font-bold text-ink-900 dark:text-ink-100">{value}</p>
-      <p className="text-xs text-ink-500 dark:text-ink-400">{label}</p>
+    <div className="card" style={{ textAlign: 'center' }}>
+      <Icon size={24} color={color} />
+      <div style={{ fontSize: 24, fontWeight: 800, marginTop: 8 }}>{value}</div>
+      <div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{label}</div>
     </div>
-  );
+  )
 }

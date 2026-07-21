@@ -1,314 +1,349 @@
-import { useEffect, useState } from 'react'
-import { X, Sparkles, Loader2, RefreshCw, Link2, Trash2, ExternalLink } from 'lucide-react'
-import { CURRICULUM } from '@/lib/curriculum'
-import { generateAI, type AIKind } from '@/lib/ai-client'
-import { loadString, saveString } from '@/lib/storage'
+import { useState, useEffect, useCallback } from 'react'
+import { X, RefreshCw, BookOpen, FileText, HelpCircle, Check } from 'lucide-react'
 import {
-  fetchMaterialLinks,
-  insertMaterialLink,
-  deleteMaterialLink,
   fetchAiMaterial,
   upsertAiMaterial,
-  type SavedLink,
-} from '@/lib/db'
-import { useAuth } from '@/lib/auth-context'
-import { TypewriterMarkdown } from '@/components/ui-bits'
+  insertLancamento,
+  insertQuestaoLancamento,
+  fetchAllTopics,
+} from '../lib/db'
+import type { Discipline, Topic } from '../lib/types'
+import { callAiFunction, slugForKind } from '../lib/ai-client'
 
-type TabId = 'leiseca' | 'resumo' | 'questoes'
+type Aba = 'leiseca' | 'resumo' | 'questoes'
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'leiseca', label: 'Lei Seca' },
-  { id: 'resumo', label: 'Resumo' },
-  { id: 'questoes', label: 'Questões' },
-]
+type Props = {
+  discipline: Discipline
+  topicId: string | null
+  onClose: () => void
+  onStudyLogged?: () => void
+}
 
-type TabState =
-  | { status: 'idle' }
-  | { status: 'loading' }
-  | { status: 'ready'; text: string; fresh: boolean }
-  | { status: 'error'; message: string }
-
-export function MaterialModal({
-  discId,
+export default function MaterialModal({
+  discipline,
   topicId,
   onClose,
-}: {
-  discId: string
-  topicId: string
-  onClose: () => void
-}) {
-  const topic = CURRICULUM[discId].topics.find((t) => t.id === topicId)!
-  const discName = CURRICULUM[discId].name
-  const { user } = useAuth()
-  const [activeTab, setActiveTab] = useState<TabId>('leiseca')
-  const [cache, setCache] = useState<Record<string, TabState>>({})
-
-  // Links salvos para a aba "Lei Seca" (persistidos no Supabase, por usuário)
-  const [links, setLinks] = useState<SavedLink[]>([])
-  const [linkInput, setLinkInput] = useState('')
-  const [linkError, setLinkError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!user) return
-    fetchMaterialLinks(user.id, discId, topicId).then(setLinks)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [discId, topicId, user])
-
-  const cacheKey = (tab: string) => `mat:${discId}:${topicId}:${tab}`
+  onStudyLogged,
+}: Props) {
+  const [aba, setAba] = useState<Aba>('resumo')
+  const [content, setContent] = useState<string>('')
+  const [loading, setLoading] = useState(true)
+  const [generating, setGenerating] = useState(false)
+  const [topic, setTopic] = useState<Topic | null>(null)
+  const [respostaSelecionada, setRespostaSelecionada] = useState<number | null>(null)
+  const [questoes, setQuestoes] = useState<Array<{
+    pergunta: string
+    alternativas: string[]
+    correta: number
+  }>>([])
+  const [questaoIdx, setQuestaoIdx] = useState(0)
 
   useEffect(() => {
-    if (activeTab === 'leiseca') return
-    if (cache[activeTab]) return
-    const tab = activeTab
-    // 1) Cache local (rápido, apenas temporário)
-    const stored = loadString(cacheKey(tab))
-    setCache((p) => ({
-      ...p,
-      [tab]: stored ? { status: 'ready', text: stored, fresh: false } : { status: 'idle' },
-    }))
-    // 2) Banco de dados = fonte oficial
-    if (user) {
-      fetchAiMaterial(user.id, discId, topicId, tab).then((dbText) => {
-        if (!dbText) return
-        saveString(cacheKey(tab), dbText)
-        setCache((p) => ({ ...p, [tab]: { status: 'ready', text: dbText, fresh: false } }))
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab])
+    fetchAllTopics().then((topics) => {
+      const t = topics.find((t) => t.id === topicId)
+      setTopic(t ?? null)
+    })
+  }, [topicId])
 
-  async function generate(tab: Exclude<TabId, 'leiseca'>) {
-    setCache((p) => ({ ...p, [tab]: { status: 'loading' } }))
-    try {
-      const text = await generateAI({
-        kind: tab as AIKind,
-        discName,
-        topicName: topic.name,
-      })
-      setCache((p) => ({ ...p, [tab]: { status: 'ready', text, fresh: true } }))
-      saveString(cacheKey(tab), text)
-      if (user) await upsertAiMaterial(user.id, discId, topicId, tab, text)
-    } catch (err) {
-      setCache((p) => ({
-        ...p,
-        [tab]: {
-          status: 'error',
-          message: err instanceof Error ? err.message : String(err),
-        },
-      }))
-    }
+  const loadContent = useCallback(
+    async (kind: Aba, force = false) => {
+      setLoading(true)
+      try {
+        if (!force) {
+          const cached = await fetchAiMaterial(
+            discipline.id,
+            topicId,
+            kind,
+          )
+          if (cached) {
+            const json = cached.content_json
+            if (kind === 'questoes') {
+              setQuestoes(
+                (json.questoes as Array<{
+                  pergunta: string
+                  alternativas: string[]
+                  correta: number
+                }>) ?? [],
+              )
+            } else {
+              setContent(
+                (json.texto as string) ??
+                  (json.conteudo as string) ??
+                  JSON.stringify(json),
+              )
+            }
+            setLoading(false)
+            return
+          }
+        }
+        setGenerating(true)
+        const result = await callAiFunction(slugForKind(kind), {
+          disciplina_id: discipline.id,
+          topico_id: topicId,
+          topico_nome: topic?.nome,
+          disciplina_nome: discipline.nome,
+        })
+        await upsertAiMaterial(discipline.id, topicId, kind, result)
+        if (kind === 'questoes') {
+          setQuestoes(
+            (result.questoes as Array<{
+              pergunta: string
+              alternativas: string[]
+              correta: number
+            }>) ?? [],
+          )
+        } else {
+          setContent(
+            (result.texto as string) ??
+              (result.conteudo as string) ??
+              JSON.stringify(result),
+          )
+        }
+      } finally {
+        setLoading(false)
+        setGenerating(false)
+      }
+    },
+    [discipline, topicId, topic],
+  )
+
+  useEffect(() => {
+    loadContent(aba)
+  }, [aba, loadContent])
+
+  async function logStudy(mastery: number, minutos: number) {
+    await insertLancamento({
+      disciplina_id: discipline.id,
+      topico_id: topicId,
+      mastery,
+      minutos,
+      is_primeiro_contato: false,
+    })
+    onStudyLogged?.()
   }
 
-  async function saveLink() {
-    if (!user) return
-    const raw = linkInput.trim()
-    if (!raw) {
-      setLinkError('Cole uma URL antes de salvar.')
-      return
-    }
-    let url = raw
-    if (!/^https?:\/\//i.test(url)) url = 'https://' + url
-    try {
-      // valida
-      // eslint-disable-next-line no-new
-      new URL(url)
-    } catch {
-      setLinkError('URL inválida.')
-      return
-    }
-    setLinkError(null)
-    const saved = await insertMaterialLink(user.id, discId, topicId, url)
-    setLinks((prev) => [...prev, saved])
-    setLinkInput('')
+  async function registrarQuestao(acertou: boolean) {
+    await insertQuestaoLancamento({
+      disciplina_id: discipline.id,
+      topico_id: topicId,
+      quantidade: 1,
+      acertos: acertou ? 1 : 0,
+      erros: acertou ? 0 : 1,
+      fonte: 'AI',
+    })
+    setRespostaSelecionada(null)
+    setQuestaoIdx((i) => i + 1)
   }
 
-  async function deleteLink(id: string) {
-    setLinks((prev) => prev.filter((l) => l.id !== id))
-    await deleteMaterialLink(id)
-  }
+  const abas: Array<{ key: Aba; label: string; icon: React.ComponentType<{ size?: number }> }> = [
+    { key: 'leiseca', label: 'Lei Seca', icon: BookOpen },
+    { key: 'resumo', label: 'Resumo', icon: FileText },
+    { key: 'questoes', label: 'Questões', icon: HelpCircle },
+  ]
 
-  const current = cache[activeTab] || { status: 'idle' }
+  const questaoAtual = questoes[questaoIdx]
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-black/70 backdrop-blur-sm sm:items-center animate-in fade-in duration-200"
-      onClick={onClose}
-    >
+    <div className="modal-overlay" onClick={onClose}>
       <div
-        className="flex max-h-[86vh] w-full flex-col overflow-hidden rounded-t-2xl border border-border bg-card sm:mx-4 sm:max-w-xl sm:rounded-2xl animate-in slide-in-from-bottom-4 duration-300"
+        className="modal"
+        style={{ maxWidth: 720, maxHeight: '85vh', overflow: 'auto' }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="flex items-start justify-between border-b border-border-soft px-5 pt-5 pb-4">
-          <div className="min-w-0 pr-3">
-            <div className="mb-1 font-mono text-[10px] text-faint">{discName}</div>
-            <div className="truncate font-display text-sm font-semibold text-foreground">
-              {topic.name}
-            </div>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'flex-start',
+            marginBottom: 16,
+          }}
+        >
+          <div>
+            <h3 style={{ fontSize: 20, marginBottom: 4 }}>{discipline.nome}</h3>
+            {topic && (
+              <p style={{ fontSize: 14, color: 'var(--text-muted)' }}>
+                {topic.nome}
+              </p>
+            )}
           </div>
-          <button
-            onClick={onClose}
-            className="shrink-0 rounded-full p-1.5 text-faint transition-transform duration-200 hover:scale-110 hover:text-foreground active:scale-95"
-            aria-label="Fechar"
-          >
-            <X size={18} />
+          <button onClick={onClose} style={{ color: 'var(--text-muted)', padding: 4 }}>
+            <X size={20} />
           </button>
         </div>
 
-        <div className="flex gap-1 px-5 pt-3">
-          {TABS.map((mt) => {
-            const active = activeTab === mt.id
-            return (
-              <button
-                key={mt.id}
-                onClick={() => setActiveTab(mt.id)}
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-300 ease-in-out active:scale-95 ${
-                  active
-                    ? 'border-primary/50 bg-card-raised text-primary'
-                    : 'border-transparent text-faint hover:text-muted-foreground'
-                }`}
-              >
-                {mt.label}
-              </button>
-            )
-          })}
-        </div>
+        {!discipline.is_redacao && (
+          <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '1px solid var(--border)' }}>
+            {abas.map((a) => {
+              const Icon = a.icon
+              const active = aba === a.key
+              return (
+                <button
+                  key={a.key}
+                  onClick={() => setAba(a.key)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    padding: '10px 16px',
+                    borderBottom: active ? '2px solid var(--primary)' : '2px solid transparent',
+                    color: active ? 'var(--primary-light)' : 'var(--text-secondary)',
+                    fontWeight: active ? 600 : 500,
+                    fontSize: 14,
+                    marginBottom: '-1px',
+                  }}
+                >
+                  <Icon size={16} />
+                  {a.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
+
+        {loading || generating ? (
+          <div className="loading-spinner">
+            <RefreshCw size={24} className="spin" />
+            <span style={{ marginLeft: 8 }}>
+              {generating ? 'Gerando conteúdo...' : 'Carregando...'}
+            </span>
+          </div>
+        ) : aba === 'questoes' ? (
+          <div>
+            {questaoAtual ? (
+              <div>
+                <div
+                  style={{
+                    fontSize: 16,
+                    fontWeight: 600,
+                    marginBottom: 16,
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {questaoAtual.pergunta}
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {questaoAtual.alternativas?.map((alt, i) => {
+                    const isCorrect = i === questaoAtual.correta
+                    const isSelected = respostaSelecionada === i
+                    let bg = 'var(--bg-elevated)'
+                    if (respostaSelecionada !== null) {
+                      if (isCorrect) bg = 'rgba(16,185,129,0.2)'
+                      else if (isSelected) bg = 'rgba(239,68,68,0.2)'
+                    }
+                    return (
+                      <button
+                        key={i}
+                        disabled={respostaSelecionada !== null}
+                        onClick={() => setRespostaSelecionada(i)}
+                        style={{
+                          textAlign: 'left',
+                          padding: '12px 16px',
+                          borderRadius: 'var(--radius-sm)',
+                          border: '1px solid var(--border)',
+                          background: bg,
+                          fontSize: 14,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          style={{
+                            fontWeight: 700,
+                            color: 'var(--text-muted)',
+                            minWidth: 20,
+                          }}
+                        >
+                          {String.fromCharCode(65 + i)}
+                        </span>
+                        {alt}
+                        {respostaSelecionada !== null && isCorrect && (
+                          <Check size={16} color="var(--success)" style={{ marginLeft: 'auto' }} />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+                {respostaSelecionada !== null && (
+                  <div style={{ marginTop: 16 }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() =>
+                        registrarQuestao(
+                          respostaSelecionada === questaoAtual.correta,
+                        )
+                      }
+                    >
+                      Próxima questão
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="empty-state">
+                <HelpCircle size={32} color="var(--text-muted)" />
+                <p style={{ marginTop: 12 }}>
+                  Sem questões geradas. Clique em recarregar.
+                </p>
+              </div>
+            )}
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 16 }}
+              onClick={() => loadContent('questoes', true)}
+            >
+              <RefreshCw size={14} /> Gerar novas
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div
+              style={{
+                fontSize: 15,
+                lineHeight: 1.7,
+                whiteSpace: 'pre-wrap',
+                color: 'var(--text-secondary)',
+              }}
+            >
+              {content}
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              style={{ marginTop: 16 }}
+              onClick={() => loadContent(aba, true)}
+            >
+              <RefreshCw size={14} /> Regenerar
+            </button>
+          </div>
+        )}
 
         <div
-          key={activeTab}
-          className="flex-1 overflow-y-auto px-5 py-4 animate-in fade-in duration-300"
+          style={{
+            marginTop: 24,
+            paddingTop: 16,
+            borderTop: '1px solid var(--border)',
+            display: 'flex',
+            gap: 8,
+          }}
         >
-          {activeTab === 'leiseca' ? (
-            <div className="space-y-4">
-              <div>
-                <label className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-[0.15em] text-faint uppercase">
-                  <Link2 size={12} /> Anexar link
-                </label>
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    inputMode="url"
-                    value={linkInput}
-                    onChange={(e) => {
-                      setLinkInput(e.target.value)
-                      if (linkError) setLinkError(null)
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') saveLink()
-                    }}
-                    placeholder="https://exemplo.com/lei-seca"
-                    className="flex-1 min-w-0 rounded-md border border-border bg-background px-3 py-2 text-xs text-foreground placeholder:text-faint outline-none transition-all duration-200 focus:border-primary/60 focus:ring-1 focus:ring-primary/40"
-                  />
-                  <button
-                    onClick={saveLink}
-                    className="shrink-0 rounded-md bg-primary px-4 py-2 font-display text-xs font-bold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-95"
-                  >
-                    Salvar
-                  </button>
-                </div>
-                {linkError && (
-                  <p className="mt-1.5 text-[10px] text-primary">{linkError}</p>
-                )}
-              </div>
-
-              <div>
-                <div className="mb-2 font-mono text-[10px] font-semibold tracking-[0.15em] text-faint uppercase">
-                  Links salvos ({links.length})
-                </div>
-                {links.length === 0 ? (
-                  <p className="rounded-md border border-dashed border-border-soft px-3 py-6 text-center text-[11px] text-faint">
-                    Nenhum link anexado ainda. Cole uma URL acima e clique em Salvar.
-                  </p>
-                ) : (
-                  <ul className="space-y-1.5">
-                    {links.map((l) => (
-                      <li
-                        key={l.id}
-                        className="flex items-center gap-2 rounded-md border border-border-soft bg-background px-3 py-2 transition-all duration-200 hover:border-primary/40"
-                      >
-                        <ExternalLink size={12} className="shrink-0 text-primary" />
-                        <a
-                          href={l.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex-1 min-w-0 truncate text-[12px] text-muted-foreground transition hover:text-foreground"
-                          title={l.url}
-                        >
-                          {l.url}
-                        </a>
-                        <button
-                          onClick={() => deleteLink(l.id)}
-                          className="shrink-0 rounded p-1 text-faint transition-all duration-200 hover:text-primary active:scale-95"
-                          aria-label="Remover link"
-                        >
-                          <Trash2 size={12} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
-          ) : (
-            <>
-              {current.status === 'idle' && (
-                <div className="py-8 text-center">
-                  <Sparkles size={22} className="mx-auto mb-2.5 text-primary" />
-                  <p className="mb-4 text-xs text-muted-foreground">
-                    Nenhum material gerado ainda para esta aba.
-                  </p>
-                  <button
-                    onClick={() => generate(activeTab)}
-                    className="rounded-md bg-primary px-4 py-2 font-display text-xs font-bold text-primary-foreground transition-all duration-200 hover:brightness-110 active:scale-95"
-                  >
-                    Gerar com IA
-                  </button>
-                </div>
-              )}
-
-              {current.status === 'loading' && (
-                <div className="flex flex-col items-center justify-center gap-2 py-10">
-                  <Loader2 size={18} className="animate-spin text-primary" />
-                  <span className="text-[11px] text-faint">Gerando conteúdo…</span>
-                </div>
-              )}
-
-              {current.status === 'error' && (
-                <div className="py-8 text-center">
-                  <p className="mb-2 text-xs text-primary">Não foi possível gerar agora.</p>
-                  <p className="mb-3 break-words px-3 font-mono text-[10px] text-faint">
-                    {current.message}
-                  </p>
-                  <button
-                    onClick={() => generate(activeTab)}
-                    className="rounded-md bg-card-raised px-4 py-2 text-xs font-bold text-foreground transition-all duration-200 hover:brightness-110 active:scale-95"
-                  >
-                    Tentar novamente
-                  </button>
-                </div>
-              )}
-
-              {current.status === 'ready' && (
-                <>
-                  <TypewriterMarkdown text={current.text} animate={current.fresh} />
-                  <button
-                    onClick={() => generate(activeTab)}
-                    className="mt-4 flex items-center gap-1 text-[11px] text-faint transition hover:text-muted-foreground"
-                  >
-                    <RefreshCw size={11} /> Gerar novamente
-                  </button>
-                </>
-              )}
-            </>
-          )}
-        </div>
-
-        <div className="flex items-center gap-1.5 border-t border-border-soft bg-secondary px-5 py-2.5">
-          <Sparkles size={11} className="text-faint" />
-          <span className="text-[9px] leading-snug text-faint">
-            {activeTab === 'leiseca'
-              ? 'Anexe suas fontes favoritas (site da lei, PDFs, artigos) para consultar rápido.'
-              : 'Gerado por IA. Confira o texto oficial antes de memorizar trechos literais.'}
-          </span>
+          <button
+            className="btn btn-primary btn-sm"
+            onClick={() => {
+              logStudy(60, 30)
+              onClose()
+            }}
+          >
+            Marcar como estudado (30 min)
+          </button>
+          <button
+            className="btn btn-ghost btn-sm"
+            onClick={() => {
+              logStudy(80, 45)
+              onClose()
+            }}
+          >
+            Estudei bem (45 min)
+          </button>
         </div>
       </div>
     </div>

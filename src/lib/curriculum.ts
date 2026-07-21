@@ -1,127 +1,218 @@
-export const MAX_PESO_EDITAL = 10;
-export const LEITNER_BOXES = [1, 2, 4, 8, 16] as const;
-export const MASTERY_THRESHOLD = 60;
-export const MAX_DAILY_MINUTES = 60;
+import type { Discipline, Topic, Lancamento, SkipCount } from './types'
 
-export type Tier = "ruim" | "medio" | "bom" | "otimo";
-export type Prioridade = "Alta" | "Média" | "Baixa";
+export type TopicMastery = {
+  topic: Topic
+  mastery: number
+  tier: 'nao_iniciado' | 'iniciado' | 'medio' | 'bom' | 'dominado'
+  lastReviewed: Date | null
+  daysSinceReview: number | null
+  isPrimeiroContato: boolean
+}
 
-export interface Discipline { id: string; nome: string; peso_edital: number; ordem: number; is_redacao?: boolean; }
-export interface Topic { id: string; disciplina_id: string; nome: string; ordem: number; }
-export interface Lancamento { id: string; disciplina_id: string; topico_id: string | null; mastery: number; minutos: number; is_primeiro_contato: boolean; criado_em: string; }
-export interface QuestaoRow { id: string; disciplina_id: string; topico_id: string | null; acertou: boolean; fonte: string | null; criado_em: string; }
+export type DisciplineMastery = {
+  discipline: Discipline
+  masteryMedio: number
+  topics: TopicMastery[]
+  lastReviewed: Date | null
+  daysSinceReview: number | null
+  topicsNaoIniciados: number
+  topicsDominados: number
+  topicsResurgir: TopicMastery[]
+}
 
-export interface DisciplinaData {
-  discipline: Discipline; topics: Topic[]; lancamentos: Lancamento[];
-  dominioMedio: number; topicosNaoDominados: number;
-  fatorEsquecimento: number; multiplicadorUrgencia: number; score: number;
+export type DisciplineScore = {
+  discipline: Discipline
+  score: number
+  masteryMedio: number
+  pesoNormalizado: number
+  fatorEsquecimento: number
+  diasSemRevisao: number | null
+  multiplicadorUrgencia: number
+  vezesPulada: number
+  motivo: string
 }
-export interface TopicoStats {
-  topic: Topic; discipline: Discipline;
-  masteryMedio: number; revisoes: number; diasDesdeUltimaRevisao: number;
-  questoesRespondidas: number; acertos: number; taxaAcertos: number;
-  erros: number; taxaErros: number; score: number;
-}
-export interface PlanoItem { topico_id: string; topico_nome: string; disciplina_nome: string; tempo_minutos: number; prioridade: Prioridade; motivo: string; }
-export interface PlanoEstudo { data: string; itens: PlanoItem[]; tempo_total: number; }
 
-export function tierFromMastery(mastery: number): Tier {
-  if (mastery < 30) return "ruim"; if (mastery < 60) return "medio"; if (mastery < 85) return "bom"; return "otimo";
+const RESURGIR_DIAS = 25
+const RESURGIR_MIN_MASTERY = 80
+
+export function computeTopicMastery(
+  topic: Topic,
+  lancamentos: Lancamento[],
+): TopicMastery {
+  const topicLanc = lancamentos.filter((l) => l.topico_id === topic.id)
+  const isFirst = topicLanc.length === 0
+  const mastery = topicLanc.length > 0
+    ? topicLanc.reduce((s, l) => s + (l.mastery ?? 0), 0) / topicLanc.length
+    : 0
+  const lastLanc = topicLanc
+    .map((l) => new Date(l.criado_em))
+    .sort((a, b) => b.getTime() - a.getTime())[0]
+  const daysSince = lastLanc
+    ? Math.floor((Date.now() - lastLanc.getTime()) / 86400000)
+    : null
+  return {
+    topic,
+    mastery: Math.round(mastery * 10) / 10,
+    tier: tierFor(mastery, isFirst),
+    lastReviewed: lastLanc ?? null,
+    daysSinceReview: daysSince,
+    isPrimeiroContato: isFirst,
+  }
 }
-export function dominioLabel(mastery: number): string {
-  if (mastery < 20) return "Muito baixo"; if (mastery < 40) return "Baixo";
-  if (mastery < 60) return "Médio"; if (mastery < 85) return "Bom"; return "Excelente";
+
+function tierFor(
+  mastery: number,
+  isFirst: boolean,
+): TopicMastery['tier'] {
+  if (isFirst) return 'nao_iniciado'
+  if (mastery < 25) return 'iniciado'
+  if (mastery < 50) return 'medio'
+  if (mastery < 80) return 'bom'
+  return 'dominado'
 }
-export function fatorEsquecimento(lancamentos: Lancamento[]): number {
-  if (lancamentos.length === 0) return 1.5;
-  const last = lancamentos.map((l) => new Date(l.criado_em).getTime()).sort((a, b) => b - a)[0];
-  const days = (Date.now() - last) / (1000 * 60 * 60 * 24);
-  if (days > 25) return 1.5; if (days > 15) return 1.3; if (days > 7) return 1.15; if (days > 3) return 1.05; return 1.0;
+
+export function computeDisciplineMastery(
+  discipline: Discipline,
+  topics: Topic[],
+  lancamentos: Lancamento[],
+): DisciplineMastery {
+  const discTopics = topics.filter((t) => t.disciplina_id === discipline.id)
+  const topicMasteries = discTopics.map((t) => computeTopicMastery(t, lancamentos))
+  const reviewed = topicMasteries.filter((tm) => !tm.isPrimeiroContato)
+  const masteryMedio =
+    reviewed.length > 0
+      ? reviewed.reduce((s, tm) => s + tm.mastery, 0) / reviewed.length
+      : 0
+  const lastReviewed = reviewed
+    .map((tm) => tm.lastReviewed)
+    .filter((d): d is Date => d !== null)
+    .sort((a, b) => b.getTime() - a.getTime())[0] ?? null
+  const daysSince = lastReviewed
+    ? Math.floor((Date.now() - lastReviewed.getTime()) / 86400000)
+    : null
+  const topicsNaoIniciados = topicMasteries.filter(
+    (tm) => tm.tier === 'nao_iniciado',
+  ).length
+  const topicsDominados = topicMasteries.filter(
+    (tm) => tm.tier === 'dominado',
+  ).length
+  const topicsResurgir = topicMasteries.filter(
+    (tm) =>
+      tm.tier === 'dominado' &&
+      tm.daysSinceReview !== null &&
+      tm.daysSinceReview >= RESURGIR_DIAS,
+  )
+  return {
+    discipline,
+    masteryMedio: Math.round(masteryMedio * 10) / 10,
+    topics: topicMasteries,
+    lastReviewed,
+    daysSinceReview: daysSince,
+    topicsNaoIniciados,
+    topicsDominados,
+    topicsResurgir,
+  }
 }
-export function dominioMedio(lancamentos: Lancamento[]): number {
-  if (lancamentos.length === 0) return 0;
-  const byTopic = new Map<string, number[]>();
-  for (const l of lancamentos) { const key = l.topico_id ?? "_disc"; if (!byTopic.has(key)) byTopic.set(key, []); byTopic.get(key)!.push(Number(l.mastery)); }
-  let sum = 0; for (const arr of byTopic.values()) sum += arr.reduce((a, b) => a + b, 0) / arr.length;
-  return sum / byTopic.size;
-}
-export function maxTopicsForDiscipline(d: DisciplinaData): number { const n = d.topicosNaoDominados; if (n >= 3) return 3; if (n === 2) return 2; return 1; }
-export function allocateTopics(topics: Topic[], lancamentos: Lancamento[], max: number): Topic[] {
-  const byTopic = new Map<string, Lancamento[]>();
-  for (const l of lancamentos) { if (!l.topico_id) continue; if (!byTopic.has(l.topico_id)) byTopic.set(l.topico_id, []); byTopic.get(l.topico_id)!.push(l); }
-  const withScore = topics.map((t) => {
-    const arr = byTopic.get(t.id) ?? [];
-    const avg = arr.length > 0 ? arr.reduce((a, b) => a + Number(b.mastery), 0) / arr.length : 0;
-    const lastDate = arr.length > 0 ? arr.map((l) => new Date(l.criado_em).getTime()).sort((a, b) => b - a)[0] : 0;
-    const daysSince = lastDate ? (Date.now() - lastDate) / (1000 * 60 * 60 * 24) : 999;
-    return { topic: t, avg, daysSince };
-  });
-  withScore.sort((a, b) => { if (a.avg !== b.avg) return a.avg - b.avg; return b.daysSince - a.daysSince; });
-  return withScore.slice(0, max).map((x) => x.topic);
-}
-export function computeScore(peso: number, dom: number, fe: number, mult: number): number { return (peso / MAX_PESO_EDITAL) * (1 - dom / 100) * fe * mult; }
-export function computeDisciplinaData(discipline: Discipline, topics: Topic[], lancamentos: Lancamento[], mult: number = 1): DisciplinaData {
-  const dom = dominioMedio(lancamentos); const fe = fatorEsquecimento(lancamentos);
-  const naoDominados = topics.filter((t) => {
-    const arr = lancamentos.filter((l) => l.topico_id === t.id);
-    if (arr.length === 0) return true;
-    return arr.reduce((a, b) => a + Number(b.mastery), 0) / arr.length < MASTERY_THRESHOLD;
-  }).length;
-  return { discipline, topics, lancamentos, dominioMedio: dom, topicosNaoDominados: naoDominados, fatorEsquecimento: fe, multiplicadorUrgencia: mult, score: computeScore(discipline.peso_edital, dom, fe, mult) };
-}
-export function nextHeroDiscipline(all: DisciplinaData[], exclude?: string): DisciplinaData | null {
-  const c = all.filter((d) => d.discipline.id !== exclude); if (c.length === 0) return null;
-  c.sort((a, b) => b.score - a.score); return c[0];
-}
-export function computeTopicoStats(topics: Topic[], disciplines: Discipline[], lancamentos: Lancamento[], questoes: QuestaoRow[]): TopicoStats[] {
-  const discMap = new Map(disciplines.map((d) => [d.id, d]));
-  return topics.map((t) => {
-    const disc = discMap.get(t.disciplina_id)!;
-    const tLancs = lancamentos.filter((l) => l.topico_id === t.id);
-    const tQuestoes = questoes.filter((q) => q.topico_id === t.id);
-    const acertos = tQuestoes.filter((q) => q.acertou).length;
-    const masteryMedio = tLancs.length > 0 ? tLancs.reduce((a, b) => a + Number(b.mastery), 0) / tLancs.length : 0;
-    const lastDate = tLancs.length > 0 ? tLancs.map((l) => new Date(l.criado_em).getTime()).sort((a, b) => b - a)[0] : 0;
-    const diasDesde = lastDate ? Math.floor((Date.now() - lastDate) / (1000 * 60 * 60 * 24)) : 999;
-    const taxaAcertos = tQuestoes.length > 0 ? (acertos / tQuestoes.length) * 100 : 0;
-    const erros = tQuestoes.length - acertos;
-    const taxaErros = tQuestoes.length > 0 ? (erros / tQuestoes.length) * 100 : 0;
-    const pesoNorm = disc.peso_edital / MAX_PESO_EDITAL;
-    const urgenciaEsquecimento = diasDesde > 25 ? 1.5 : diasDesde > 15 ? 1.3 : diasDesde > 7 ? 1.15 : diasDesde > 3 ? 1.05 : 1.0;
-    const fatorErros = 1 + taxaErros / 100;
-    const fatorNovidade = tLancs.length === 0 ? 2.0 : 1 + 1 / (tLancs.length + 1);
-    const score = pesoNorm * (1 - masteryMedio / 100) * urgenciaEsquecimento * fatorErros * fatorNovidade;
-    return { topic: t, discipline: disc, masteryMedio, revisoes: tLancs.length, diasDesdeUltimaRevisao: diasDesde, questoesRespondidas: tQuestoes.length, acertos, taxaAcertos, erros, taxaErros, score };
-  });
-}
-export function computeDailyPlan(topicoStats: TopicoStats[], dataStr: string): PlanoEstudo {
-  const sorted = [...topicoStats].sort((a, b) => b.score - a.score);
-  const avgMastery = sorted.length > 0 ? sorted.reduce((a, b) => a + b.masteryMedio, 0) / sorted.length : 0;
-  let maxTopicos: number;
-  if (avgMastery < 40) maxTopicos = 1; else if (avgMastery < 60) maxTopicos = 2; else if (avgMastery < 80) maxTopicos = 3; else maxTopicos = 4;
-  const avgErrorRate = sorted.length > 0 ? sorted.reduce((a, b) => a + b.taxaErros, 0) / sorted.length : 0;
-  if (avgErrorRate > 40 && maxTopicos > 1) maxTopicos = Math.max(1, maxTopicos - 1);
-  const selected = sorted.slice(0, maxTopicos);
-  const totalWeight = selected.reduce((sum, s) => sum + (100 - s.masteryMedio + 10), 0);
-  const itens: PlanoItem[] = selected.map((s) => {
-    const weight = (100 - s.masteryMedio + 10) / totalWeight;
-    const tempo = Math.max(10, Math.round(MAX_DAILY_MINUTES * weight));
-    let prioridade: Prioridade = "Média";
-    if (s.score > 1.5 || s.masteryMedio < 30 || s.taxaErros > 50) prioridade = "Alta";
-    else if (s.masteryMedio > 70 && s.taxaErros < 20) prioridade = "Baixa";
-    const motivos: string[] = [];
-    if (s.revisoes === 0) motivos.push("Este tópico ainda não foi estudado nenhuma vez.");
-    else {
-      if (s.taxaAcertos < 60 && s.questoesRespondidas > 0) motivos.push(`Seu índice de acertos foi de apenas ${Math.round(s.taxaAcertos)}%.`);
-      if (s.diasDesdeUltimaRevisao > 7) motivos.push(`Última revisão foi há ${s.diasDesdeUltimaRevisao} dias.`);
-      if (s.masteryMedio < 40) motivos.push(`Domínio atual baixo (${Math.round(s.masteryMedio)}%).`);
-      if (s.revisoes < 3) motivos.push(`Apenas ${s.revisoes} revisão(ões) registrada(s).`);
+
+export function computeAllScores(
+  disciplines: Discipline[],
+  topics: Topic[],
+  lancamentos: Lancamento[],
+  skipCounts: SkipCount[],
+): DisciplineScore[] {
+  const maxPeso = Math.max(...disciplines.map((d) => d.peso_edital), 1)
+  const masteries = disciplines.map((d) =>
+    computeDisciplineMastery(d, topics, lancamentos),
+  )
+  const scores: DisciplineScore[] = masteries.map((dm) => {
+    const pesoNorm = dm.discipline.peso_edital / maxPeso
+    const dominioNorm = dm.masteryMedio / 100
+    const dias = dm.daysSinceReview ?? 9999
+    const fatorEsquecimento = Math.min(2.5, 1 + dias / 5)
+    const skip = skipCounts.find(
+      (s) => s.disciplina_id === dm.discipline.id,
+    )
+    const multiplicador = skip ? Number(skip.multiplicador_urgencia) : 1
+    const vezesPulada = skip ? skip.vezes_pulada : 0
+    const score =
+      pesoNorm * (1 - dominioNorm) * fatorEsquecimento * multiplicador
+    return {
+      discipline: dm.discipline,
+      score: Math.round(score * 100) / 100,
+      masteryMedio: dm.masteryMedio,
+      pesoNormalizado: Math.round(pesoNorm * 100) / 100,
+      fatorEsquecimento: Math.round(fatorEsquecimento * 100) / 100,
+      diasSemRevisao: dm.daysSinceReview,
+      multiplicadorUrgencia: multiplicador,
+      vezesPulada,
+      motivo: buildMotivo(dm, pesoNorm, fatorEsquecimento, dias, vezesPulada),
     }
-    if (s.discipline.peso_edital >= 8) motivos.push(`Disciplina de alta importância no edital (peso ${s.discipline.peso_edital}).`);
-    if (motivos.length === 0) motivos.push("Revisão de manutenção recomendada.");
-    return { topico_id: s.topic.id, topico_nome: s.topic.nome, disciplina_nome: s.discipline.nome, tempo_minutos: tempo, prioridade, motivo: motivos.join(" ") };
-  });
-  let tempoTotal = itens.reduce((a, b) => a + b.tempo_minutos, 0);
-  if (tempoTotal > MAX_DAILY_MINUTES) { const ratio = MAX_DAILY_MINUTES / tempoTotal; itens.forEach((i) => { i.tempo_minutos = Math.max(10, Math.round(i.tempo_minutos * ratio)); }); tempoTotal = itens.reduce((a, b) => a + b.tempo_minutos, 0); }
-  return { data: dataStr, itens, tempo_total: tempoTotal };
+  })
+  return scores.sort((a, b) => b.score - a.score)
+}
+
+function buildMotivo(
+  dm: DisciplineMastery,
+  pesoNorm: number,
+  fatorEsc: number,
+  dias: number,
+  vezesPulada: number,
+): string {
+  const parts: string[] = []
+  parts.push(`peso ${dm.discipline.peso_edital} no edital`)
+  if (dm.masteryMedio > 0) {
+    parts.push(`domínio médio ${Math.round(dm.masteryMedio)}%`)
+  } else {
+    parts.push(`sem tópicos revisados ainda`)
+  }
+  if (dm.daysSinceReview !== null) {
+    parts.push(`sem revisão há ${dias} ${dias === 1 ? 'dia' : 'dias'}`)
+  } else {
+    parts.push(`nunca revisada`)
+  }
+  if (vezesPulada > 0) {
+    parts.push(`pulada ${vezesPulada}x (urgência ×${fatorEsc.toFixed(1)})`)
+  }
+  return parts.join(', ')
+}
+
+export function nextHeroDiscipline(
+  disciplines: Discipline[],
+  topics: Topic[],
+  lancamentos: Lancamento[],
+  skipCounts: SkipCount[],
+): DisciplineScore {
+  const scores = computeAllScores(disciplines, topics, lancamentos, skipCounts)
+  return scores[0]
+}
+
+export function tetoTopicosPorDesempenho(masteryMedio: number): number {
+  if (masteryMedio < 25) return 2
+  if (masteryMedio < 50) return 3
+  if (masteryMedio < 75) return 4
+  return 5
+}
+
+export function selectTopicsForSession(
+  dm: DisciplineMastery,
+  teto: number,
+): TopicMastery[] {
+  const resurgir = dm.topicsResurgir
+  if (resurgir.length > 0) {
+    return [resurgir[0]]
+  }
+  const naoIniciados = dm.topics.filter((t) => t.tier === 'nao_iniciado')
+  const iniciados = dm.topics.filter(
+    (t) => t.tier === 'iniciado' || t.tier === 'medio',
+  )
+  const prioritarios = [...naoIniciados, ...iniciados]
+  if (prioritarios.length === 0) {
+    const bom = dm.topics.filter((t) => t.tier === 'bom')
+    return bom.slice(0, teto)
+  }
+  return prioritarios.slice(0, teto)
+}
+
+export function nextSkipMultiplier(current: number): number {
+  return Math.min(3, Number(current) + 0.5)
 }
