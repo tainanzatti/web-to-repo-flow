@@ -12,10 +12,10 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const { topico_nome, disciplina_nome, lei_seca_contexto } = await req.json();
+    const { conteudo } = await req.json();
 
-    if (!topico_nome || !disciplina_nome) {
-      return new Response(JSON.stringify({ error: "Tópico e disciplina são obrigatórios" }), {
+    if (!conteudo || typeof conteudo !== "string") {
+      return new Response(JSON.stringify({ error: "Conteúdo é obrigatório" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -29,19 +29,18 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const ctx = lei_seca_contexto ? `\n\nMateriais de lei seca fornecidos pelo candidato:\n${lei_seca_contexto}` : "";
+    const prompt = `Você é um especialista em concursos públicos para a Polícia Militar de Santa Catarina (PMSC). Com base no conteúdo de estudo fornecido abaixo, gere UM tema de redação dissertativa-argumentativa que seja relevante para o concurso da PMSC e que se relacione com os temas estudados pelo candidato.
 
-    const prompt = `Você é um especialista em concursos públicos para a Polícia Militar de Santa Catarina (PMSC). Crie um resumo de estudo claro, objetivo e bem estruturado sobre o tópico "${topico_nome}" da disciplina "${disciplina_nome}".
+O tema deve ser:
+- Atual e relevante para a realidade da segurança pública
+- Relacionado ao conteúdo estudado quando possível
+- No formato de tema de redação dissertativa-argumentativa (conciso, claro, provocativo)
+- No máximo 120 caracteres
 
-O resumo deve:
-- Ter no máximo 800 palavras
-- Usar linguagem clara e direta
-- Destacar os pontos mais importantes para prova
-- Usar formatação em tópicos quando relevante
-- Focar no que cai em provas da AOCP
-- Ser em português brasileiro${ctx}
+Retorne APENAS o tema, sem explicações, sem aspas, sem texto adicional.
 
-Retorne APENAS o resumo, sem comentários adicionais.`;
+Conteúdo de estudo do candidato:
+${conteudo.slice(0, 4000)}`;
 
     const response = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`,
@@ -50,7 +49,7 @@ Retorne APENAS o resumo, sem comentários adicionais.`;
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.3, maxOutputTokens: 1500 },
+          generationConfig: { temperature: 0.7, maxOutputTokens: 150 },
         }),
       }
     );
@@ -64,16 +63,16 @@ Retorne APENAS o resumo, sem comentários adicionais.`;
     }
 
     const data = await response.json();
-    const resumo = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
+    const tema = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
 
-    if (!resumo) {
-      return new Response(JSON.stringify({ error: "Não foi possível gerar o resumo" }), {
+    if (!tema) {
+      return new Response(JSON.stringify({ error: "Não foi possível gerar o tema" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    return new Response(JSON.stringify({ resumo }), {
+    return new Response(JSON.stringify({ tema }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

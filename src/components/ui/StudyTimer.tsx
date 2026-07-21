@@ -1,45 +1,7 @@
 import { Play, Pause, RotateCcw, Clock } from "lucide-react";
 import { useTimer, formatTime } from "../../lib/timer-context";
-
 export function StudyTimer() {
   const { status, elapsedSeconds, start, pause, reset } = useTimer();
-
-  const statusColor =
-    status === "running"
-      ? "text-success-600 dark:text-success-400"
-      : status === "paused"
-      ? "text-warning-600 dark:text-warning-400"
-      : "text-ink-500 dark:text-ink-400";
-
-  return (
-    <div className="card p-4 flex items-center gap-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${status === "running" ? "bg-success-50 dark:bg-success-900/30" : "bg-ink-100 dark:bg-ink-800"}`}>
-        <Clock className={`w-5 h-5 ${statusColor}`} />
-      </div>
-
-      <div className="flex-1">
-        <p className="text-xs text-ink-500 dark:text-ink-400">
-          {status === "running" ? "Cronômetro rodando" : status === "paused" ? "Pausado" : "Cronômetro parado"}
-        </p>
-        <p className={`text-2xl font-bold tabular-nums ${statusColor}`}>
-          {formatTime(elapsedSeconds)}
-        </p>
-      </div>
-
-      <div className="flex gap-2">
-        {status !== "running" ? (
-          <button onClick={start} className="btn-primary px-3 py-2" aria-label="Iniciar cronômetro" title="Iniciar">
-            <Play className="w-4 h-4" />
-          </button>
-        ) : (
-          <button onClick={pause} className="btn-secondary px-3 py-2" aria-label="Pausar cronômetro" title="Pausar">
-            <Pause className="w-4 h-4" />
-          </button>
-        )}
-        <button onClick={reset} className="btn-ghost px-3 py-2" aria-label="Reiniciar cronômetro" title="Reiniciar" disabled={status === "idle" && elapsedSeconds === 0}>
-          <RotateCcw className="w-4 h-4" />
-        </button>
-      </div>
-    </div>
-  );
+  const sc = status === "running" ? "text-success-600 dark:text-success-400" : status === "paused" ? "text-warning-600 dark:text-warning-400" : "text-ink-500 dark:text-ink-400";
+  return <div className="card p-4 flex items-center gap-4"><div className={`w-10 h-10 rounded-xl flex items-center justify-center ${status === "running" ? "bg-success-50 dark:bg-success-900/30" : "bg-ink-100 dark:bg-ink-800"}`}><Clock className={`w-5 h-5 ${sc}`} /></div><div className="flex-1"><p className="text-xs text-ink-500 dark:text-ink-400">{status === "running" ? "Cronômetro rodando" : status === "paused" ? "Pausado" : "Cronômetro parado"}</p><p className={`text-2xl font-bold tabular-nums ${sc}`}>{formatTime(elapsedSeconds)}</p></div><div className="flex gap-2">{status !== "running" ? <button onClick={start} className="btn-primary px-3 py-2" aria-label="Iniciar"><Play className="w-4 h-4" /></button> : <button onClick={pause} className="btn-secondary px-3 py-2" aria-label="Pausar"><Pause className="w-4 h-4" /></button>}<button onClick={reset} className="btn-ghost px-3 py-2" aria-label="Reiniciar" disabled={status === "idle" && elapsedSeconds === 0}><RotateCcw className="w-4 h-4" /></button></div></div>;
 }

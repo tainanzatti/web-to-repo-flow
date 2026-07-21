@@ -1,58 +1,16 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Sidebar } from "./components/sidebar";
-import { NucleoView } from "./components/views/nucleo-view";
-import { FlashcardsView } from "./components/views/flashcards-view";
-import { QuestoesView } from "./components/views/questoes-view";
-import { RedacaoView } from "./components/views/redacao-view";
-import { PainelView } from "./components/views/painel-view";
-import { PerfilView } from "./components/views/perfil-view";
-import { DesempenhoView } from "./components/views/desempenho-view";
+import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
-import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import { ThemeToggle } from "./components/ui/ThemeToggle";
-import { useAuth } from "./lib/auth-context";
-
-function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="flex min-h-screen bg-ink-50 dark:bg-ink-950">
-      <Sidebar />
-      <div className="absolute top-4 left-20 z-50">
-        <ThemeToggle />
-      </div>
-      <main className="flex-1 p-6 overflow-x-hidden">{children}</main>
-    </div>
-  );
-}
-
-function PublicRoute({ children }: { children: React.ReactNode }) {
-  const { session, loading } = useAuth();
-  if (loading) return null;
-  if (session) return <Navigate to="/painel" replace />;
-  return <>{children}</>;
-}
+import { PainelView } from "./components/views/painel-view";
+import { NucleoView } from "./components/views/nucleo-view";
+import { FlashcardsView } from "./components/views/flashcards-view";
+import { RedacaoView } from "./components/views/redacao-view";
+import { DesempenhoView } from "./components/views/desempenho-view";
+import { PerfilView } from "./components/views/perfil-view";
+import { QuestoesView } from "./components/views/questoes-view";
 
 export default function App() {
-  return (
-    <Routes>
-      <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
-      <Route path="/cadastro" element={<PublicRoute><Register /></PublicRoute>} />
-      <Route path="/*" element={
-        <ProtectedRoute>
-          <AppLayout>
-            <Routes>
-              <Route path="/" element={<Navigate to="/painel" replace />} />
-              <Route path="/painel" element={<PainelView />} />
-              <Route path="/nucleo" element={<NucleoView />} />
-              <Route path="/flashcards" element={<FlashcardsView />} />
-              <Route path="/questoes" element={<QuestoesView />} />
-              <Route path="/redacao" element={<RedacaoView />} />
-              <Route path="/desempenho" element={<DesempenhoView />} />
-              <Route path="/perfil" element={<PerfilView />} />
-            </Routes>
-          </AppLayout>
-        </ProtectedRoute>
-      } />
-    </Routes>
-  );
+  return <BrowserRouter><Routes><Route path="/login" element={<Login />} /><Route path="/cadastro" element={<Register />} /><Route element={<ProtectedRoute><div className="min-h-screen bg-ink-50 dark:bg-ink-950 flex"><Sidebar /><main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8"><Routes><Route path="/" element={<PainelView />} /><Route path="/painel" element={<PainelView />} /><Route path="/nucleo" element={<NucleoView />} /><Route path="/flashcards" element={<FlashcardsView />} /><Route path="/redacao" element={<RedacaoView />} /><Route path="/questoes" element={<QuestoesView />} /><Route path="/desempenho" element={<DesempenhoView />} /><Route path="/perfil" element={<PerfilView />} /></Routes></main></div></ProtectedRoute>}>{/* placeholder */}<Route path="*" element={<PainelView />} /></Route></Routes></BrowserRouter>;
 }
