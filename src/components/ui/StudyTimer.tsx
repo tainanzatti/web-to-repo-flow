@@ -28,31 +28,15 @@ export function StudyTimer() {
 
       <div className="flex gap-2">
         {status !== "running" ? (
-          <button
-            onClick={start}
-            className="btn-primary px-3 py-2"
-            aria-label="Iniciar cronômetro"
-            title="Iniciar"
-          >
+          <button onClick={start} className="btn-primary px-3 py-2" aria-label="Iniciar cronômetro" title="Iniciar">
             <Play className="w-4 h-4" />
           </button>
         ) : (
-          <button
-            onClick={pause}
-            className="btn-secondary px-3 py-2"
-            aria-label="Pausar cronômetro"
-            title="Pausar"
-          >
+          <button onClick={pause} className="btn-secondary px-3 py-2" aria-label="Pausar cronômetro" title="Pausar">
             <Pause className="w-4 h-4" />
           </button>
         )}
-        <button
-          onClick={reset}
-          className="btn-ghost px-3 py-2"
-          aria-label="Reiniciar cronômetro"
-          title="Reiniciar"
-          disabled={status === "idle" && elapsedSeconds === 0}
-        >
+        <button onClick={reset} className="btn-ghost px-3 py-2" aria-label="Reiniciar cronômetro" title="Reiniciar" disabled={status === "idle" && elapsedSeconds === 0}>
           <RotateCcw className="w-4 h-4" />
         </button>
       </div>

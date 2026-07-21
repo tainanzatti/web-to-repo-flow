@@ -89,6 +89,60 @@ export async function insertQuestao(disciplinaId: string, topicoId: string | nul
   if (error) throw error;
 }
 
+// --- Questão Lançamentos (batch entries) ---
+
+export interface QuestaoLancamentoRow {
+  id: string;
+  user_id: string;
+  disciplina_id: string;
+  topico_id: string | null;
+  quantidade: number;
+  acertos: number;
+  erros: number;
+  fonte: string | null;
+  criado_em: string;
+}
+
+export async function fetchQuestaoLancamentos(): Promise<QuestaoLancamentoRow[]> {
+  const { data, error } = await supabase
+    .from("questao_lancamentos")
+    .select("*")
+    .order("criado_em", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as QuestaoLancamentoRow[];
+}
+
+export async function insertQuestaoLancamento(
+  disciplinaId: string,
+  topicoId: string | null,
+  quantidade: number,
+  acertos: number,
+  fonte: string | null
+): Promise<QuestaoLancamentoRow | null> {
+  const erros = Math.max(0, quantidade - acertos);
+  const { data, error } = await supabase
+    .from("questao_lancamentos")
+    .insert({
+      disciplina_id: disciplinaId,
+      topico_id: topicoId || null,
+      quantidade,
+      acertos,
+      erros,
+      fonte,
+    })
+    .select("*")
+    .single();
+  if (error) throw error;
+  return data as QuestaoLancamentoRow;
+}
+
+export async function deleteQuestaoLancamento(id: string): Promise<void> {
+  const { error } = await supabase.from("questao_lancamentos").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// --- Redação ---
+
 export interface RedacaoRow {
   id: string; tema: string; texto: string;
   nota: number | null; feedback_json: { nota?: number; correcao?: string } | null;
@@ -107,6 +161,8 @@ export async function insertRedacao(tema: string, texto: string): Promise<Redaca
   return data as RedacaoRow;
 }
 
+// --- Profile ---
+
 export interface ProfileRow {
   id: string; nome: string; email: string;
   telefone: string | null; data_nascimento: string | null;
@@ -117,11 +173,6 @@ export async function fetchProfile(userId: string): Promise<ProfileRow | null> {
   const { data, error } = await supabase.from("profiles").select("*").eq("id", userId).maybeSingle();
   if (error) throw error;
   return data as ProfileRow | null;
-}
-
-export async function updateProfileTema(userId: string, tema: string): Promise<void> {
-  const { error } = await supabase.from("profiles").update({ tema }).eq("id", userId);
-  if (error) throw error;
 }
 
 // --- Lei Seca ---

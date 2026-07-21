@@ -10,9 +10,7 @@ export function StatCard({ icon, label, value, color }: { icon: ReactNode; label
   };
   return (
     <div className="card p-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colorMap[color] ?? colorMap.brand}`}>
-        {icon}
-      </div>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colorMap[color] ?? colorMap.brand}`}>{icon}</div>
       <p className="text-2xl font-bold text-ink-900 dark:text-ink-100">{value}</p>
       <p className="text-xs text-ink-500 dark:text-ink-400 mt-0.5">{label}</p>
     </div>

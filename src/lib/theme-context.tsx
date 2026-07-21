@@ -27,13 +27,11 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     return cached ?? "light";
   });
 
-  // Apply theme class immediately on mount and whenever theme changes
   useEffect(() => {
     applyThemeClass(theme);
     localStorage.setItem(STORAGE_KEY, theme);
   }, [theme]);
 
-  // Load theme from Supabase profile when user logs in
   useEffect(() => {
     if (!user) return;
     supabase
@@ -43,26 +41,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
       .maybeSingle()
       .then(({ data }) => {
         const dbTheme = (data as { tema?: string } | null)?.tema;
-        if (dbTheme === "dark" || dbTheme === "light") {
-          setThemeState(dbTheme);
-        }
+        if (dbTheme === "dark" || dbTheme === "light") setThemeState(dbTheme);
       });
   }, [user]);
 
-  const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
-  }, []);
+  const setTheme = useCallback((t: Theme) => setThemeState(t), []);
 
   const toggleTheme = useCallback(() => {
     setThemeState((prev) => {
       const next: Theme = prev === "dark" ? "light" : "dark";
-      // Persist to Supabase if logged in
       if (user) {
-        supabase
-          .from("profiles")
-          .update({ tema: next })
-          .eq("id", user.id)
-          .then(() => {});
+        supabase.from("profiles").update({ tema: next }).eq("id", user.id).then(() => {});
       }
       return next;
     });

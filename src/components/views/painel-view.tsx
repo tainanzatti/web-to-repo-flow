@@ -48,31 +48,17 @@ export function PainelView() {
     setPlanoErro(null);
     const stats = computeTopicoStats(topics, disciplines, lancamentos, questoes);
     const inputs: PlanoAIInput[] = stats.slice(0, 10).map((s) => ({
-      topico_id: s.topic.id,
-      topico_nome: s.topic.nome,
-      disciplina_nome: s.discipline.nome,
-      mastery: s.masteryMedio,
-      revisoes: s.revisoes,
-      dias_desde_ultima: s.diasDesdeUltimaRevisao,
-      questoes: s.questoesRespondidas,
-      acertos: s.acertos,
-      taxa_acertos: s.taxaAcertos,
-      taxa_erros: s.taxaErros,
-      peso_edital: s.discipline.peso_edital,
+      topico_id: s.topic.id, topico_nome: s.topic.nome, disciplina_nome: s.discipline.nome,
+      mastery: s.masteryMedio, revisoes: s.revisoes, dias_desde_ultima: s.diasDesdeUltimaRevisao,
+      questoes: s.questoesRespondidas, acertos: s.acertos, taxa_acertos: s.taxaAcertos,
+      taxa_erros: s.taxaErros, peso_edital: s.discipline.peso_edital,
     }));
     const { plano: aiPlano, error } = await gerarPlanoAI(inputs);
-    if (error || !aiPlano) {
-      setPlanoErro(error ?? "Erro ao gerar plano");
-      setGerandoPlano(false);
-      return;
-    }
+    if (error || !aiPlano) { setPlanoErro(error ?? "Erro ao gerar plano"); setGerandoPlano(false); return; }
     await savePlanoHoje(aiPlano);
     setPlano({
       data: new Date().toISOString().slice(0, 10),
-      itens: aiPlano.itens.map((i) => ({
-        ...i,
-        prioridade: (["Alta", "Média", "Baixa"].includes(i.prioridade) ? i.prioridade : "Média") as Prioridade,
-      })),
+      itens: aiPlano.itens.map((i) => ({ ...i, prioridade: (["Alta", "Média", "Baixa"].includes(i.prioridade) ? i.prioridade : "Média") as Prioridade })),
       tempo_total: aiPlano.tempo_total,
     });
     setGerandoPlano(false);
@@ -113,10 +99,8 @@ export function PainelView() {
         <p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Visão geral do seu progresso no concurso Soldado PMSC 2026.</p>
       </div>
 
-      {/* Study Timer */}
       <StudyTimer />
 
-      {/* Study Time Dashboard */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<Clock className="w-5 h-5" />} label="Tempo estudado hoje" value={formatTime(studyStats?.today ?? 0)} color="brand" />
         <StatCard icon={<Timer className="w-5 h-5" />} label="Esta semana" value={formatTime(studyStats?.week ?? 0)} color="success" />
@@ -124,7 +108,6 @@ export function PainelView() {
         <StatCard icon={<Timer className="w-5 h-5" />} label="Tempo total" value={formatTime(studyStats?.total ?? 0)} color="ink" />
       </div>
 
-      {/* Plano de Estudos de Hoje */}
       <div className="card p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -158,9 +141,7 @@ export function PainelView() {
                         <p className="text-sm font-semibold text-ink-900 dark:text-ink-100">{item.topico_nome}</p>
                       </div>
                     </div>
-                    <span className={`text-xs px-2 py-1 rounded-full border font-medium shrink-0 ${prioridadeColor[item.prioridade] ?? prioridadeColor["Média"]}`}>
-                      {item.prioridade}
-                    </span>
+                    <span className={`text-xs px-2 py-1 rounded-full border font-medium shrink-0 ${prioridadeColor[item.prioridade] ?? prioridadeColor["Média"]}`}>{item.prioridade}</span>
                   </div>
                   <div className="flex items-center gap-3 ml-6">
                     <span className="text-xs text-ink-500 dark:text-ink-400 flex items-center gap-1"><Clock className="w-3 h-3" /> {item.tempo_minutos} min</span>
@@ -178,7 +159,6 @@ export function PainelView() {
         {planoErro && <p className="text-xs text-error-600 dark:text-error-400 mt-2 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {planoErro}</p>}
       </div>
 
-      {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard icon={<TrendingUp className="w-5 h-5" />} label="Domínio geral" value={`${Math.round(domGeral)}%`} color="brand" />
         <StatCard icon={<Target className="w-5 h-5" />} label="Taxa de acertos" value={`${taxaAcertos.toFixed(0)}%`} color="success" />
@@ -186,7 +166,6 @@ export function PainelView() {
         <StatCard icon={<Clock className="w-5 h-5" />} label="Lançamentos" value={`${totalLanc}`} color="ink" />
       </div>
 
-      {/* Projeção */}
       <div className="card p-6">
         <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4 flex items-center gap-2"><Calculator className="w-4 h-4" /> Projeção de cobertura</h3>
         <div className="space-y-4">
@@ -208,7 +187,6 @@ export function PainelView() {
         </div>
       </div>
 
-      {/* Progress by discipline */}
       <div className="card p-6">
         <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4">Progresso por disciplina</h3>
         <div className="space-y-3">

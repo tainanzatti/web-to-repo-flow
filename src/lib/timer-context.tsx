@@ -50,131 +50,78 @@ export function TimerProvider({ children }: { children: ReactNode }) {
   const sessionIdRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Restore state on mount / user change
   useEffect(() => {
     if (!user) {
-      setStatus("idle");
-      setElapsedSeconds(0);
-      sessionIdRef.current = null;
-      setStudyStats(null);
+      setStatus("idle"); setElapsedSeconds(0); sessionIdRef.current = null; setStudyStats(null);
       return;
     }
-
     const stored = loadStoredState();
-
-    // Try to restore active session from DB
     fetchActiveSession()
       .then((session) => {
         if (session) {
           sessionIdRef.current = session.id;
           const inicio = new Date(session.inicio).getTime();
-          const now = Date.now();
-          const dbElapsed = Math.floor((now - inicio) / 1000);
-
+          const dbElapsed = Math.floor((Date.now() - inicio) / 1000);
           if (stored.status === "paused" && stored.sessionId === session.id) {
-            setStatus("paused");
-            setElapsedSeconds(stored.elapsedSeconds);
+            setStatus("paused"); setElapsedSeconds(stored.elapsedSeconds);
           } else {
-            setStatus("running");
-            setElapsedSeconds(dbElapsed);
+            setStatus("running"); setElapsedSeconds(dbElapsed);
           }
         } else if (stored.status !== "idle" && stored.sessionId) {
-          // No active session in DB — clear stale local state
-          setStatus("idle");
-          setElapsedSeconds(0);
-          sessionIdRef.current = null;
+          setStatus("idle"); setElapsedSeconds(0); sessionIdRef.current = null;
           saveStoredState({ status: "idle", elapsedSeconds: 0, sessionId: null, lastTick: null });
         }
       })
       .catch(() => {});
-
     refreshStats();
   }, [user]);
 
-  // Tick interval
   useEffect(() => {
     if (status === "running") {
       intervalRef.current = setInterval(() => {
         setElapsedSeconds((prev) => {
           const next = prev + 1;
-          saveStoredState({
-            status: "running",
-            elapsedSeconds: next,
-            sessionId: sessionIdRef.current,
-            lastTick: Date.now(),
-          });
+          saveStoredState({ status: "running", elapsedSeconds: next, sessionId: sessionIdRef.current, lastTick: Date.now() });
           return next;
         });
       }, 1000);
     }
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
+    return () => { if (intervalRef.current) { clearInterval(intervalRef.current); intervalRef.current = null; } };
   }, [status]);
 
-  // Persist to daily time every 60 seconds while running
   useEffect(() => {
     if (status !== "running") return;
     const flushInterval = setInterval(async () => {
-      try {
-        await addDailyTime(60);
-        await refreshStats();
-      } catch {}
+      try { await addDailyTime(60); await refreshStats(); } catch {}
     }, 60000);
     return () => clearInterval(flushInterval);
   }, [status]);
 
   const refreshStats = useCallback(async () => {
-    try {
-      const stats = await fetchStudyTimeStats();
-      setStudyStats(stats);
-    } catch {}
+    try { setStudyStats(await fetchStudyTimeStats()); } catch {}
   }, []);
 
   const start = useCallback(async () => {
     if (status === "running") return;
     if (!sessionIdRef.current) {
-      try {
-        const session = await startStudySession();
-        sessionIdRef.current = session?.id ?? null;
-      } catch {}
+      try { const s = await startStudySession(); sessionIdRef.current = s?.id ?? null; } catch {}
     }
     setStatus("running");
-    saveStoredState({
-      status: "running",
-      elapsedSeconds,
-      sessionId: sessionIdRef.current,
-      lastTick: Date.now(),
-    });
+    saveStoredState({ status: "running", elapsedSeconds, sessionId: sessionIdRef.current, lastTick: Date.now() });
   }, [status, elapsedSeconds]);
 
   const pause = useCallback(async () => {
     setStatus("paused");
-    saveStoredState({
-      status: "paused",
-      elapsedSeconds,
-      sessionId: sessionIdRef.current,
-      lastTick: null,
-    });
+    saveStoredState({ status: "paused", elapsedSeconds, sessionId: sessionIdRef.current, lastTick: null });
   }, [elapsedSeconds]);
 
   const reset = useCallback(async () => {
     if (sessionIdRef.current) {
-      try {
-        await endStudySession(sessionIdRef.current, elapsedSeconds);
-        await addDailyTime(elapsedSeconds);
-        await refreshStats();
-      } catch {}
+      try { await endStudySession(sessionIdRef.current, elapsedSeconds); await addDailyTime(elapsedSeconds); await refreshStats(); } catch {}
     }
-    sessionIdRef.current = null;
-    setStatus("idle");
-    setElapsedSeconds(0);
+    sessionIdRef.current = null; setStatus("idle"); setElapsedSeconds(0);
     saveStoredState({ status: "idle", elapsedSeconds: 0, sessionId: null, lastTick: null });
-  }, [elapsedSeconds]);
+  }, [elapsedSeconds, refreshStats]);
 
   return (
     <TimerContext.Provider value={{ status, elapsedSeconds, start, pause, reset, studyStats, refreshStats }}>

@@ -26,6 +26,8 @@ export interface Lancamento {
   disciplina_id: string;
   topico_id: string | null;
   mastery: number;
+  minutos: number;
+  is_primeiro_contato: boolean;
   criado_em: string;
 }
 
@@ -83,6 +85,14 @@ export function tierFromMastery(mastery: number): Tier {
   if (mastery < 60) return "medio";
   if (mastery < 85) return "bom";
   return "otimo";
+}
+
+export function dominioLabel(mastery: number): string {
+  if (mastery < 20) return "Muito baixo";
+  if (mastery < 40) return "Baixo";
+  if (mastery < 60) return "Médio";
+  if (mastery < 85) return "Bom";
+  return "Excelente";
 }
 
 export function fatorEsquecimento(lancamentos: Lancamento[]): number {
