@@ -21,10 +21,7 @@ export async function callGemini(
 
   const body: Record<string, unknown> = {
     contents: [{ role: 'user', parts: [{ text: prompt }] }],
-    generationConfig: {
-      temperature: 0.7,
-      maxOutputTokens: 4096,
-    },
+    generationConfig: { temperature: 0.7, maxOutputTokens: 4096 },
   }
 
   if (systemInstruction) {
