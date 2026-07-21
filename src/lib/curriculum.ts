@@ -1,198 +1,181 @@
-export type DisciplineId = string;
-export type TopicId = string;
+export const MAX_PESO_EDITAL = 10;
+
+export const MINUTOS_POR_TOPICO_ESTUDO = 25;
+export const MINUTOS_POR_TOPICO_REVISAO = 10;
+export const MAX_TOPICS_PER_SESSION = 3;
+export const MIN_TOPICS_PER_SESSION = 1;
+
+export const LEITNER_BOXES = [1, 2, 4, 8, 16] as const;
+export const MASTERY_THRESHOLD = 60;
+export const RESURFACE_DAYS = 25;
+export const SKIP_MULTIPLIER = 1.5;
+
+export type Tier = "ruim" | "medio" | "bom" | "otimo";
 
 export interface Discipline {
-  id: DisciplineId;
+  id: string;
   nome: string;
   peso_edital: number;
   ordem: number;
-  is_redacao: boolean;
+  is_redacao?: boolean;
 }
 
 export interface Topic {
-  id: TopicId;
-  disciplina_id: DisciplineId;
+  id: string;
+  disciplina_id: string;
   nome: string;
   ordem: number;
 }
 
 export interface Lancamento {
   id: string;
-  disciplina_id: DisciplineId;
-  topico_id: TopicId | null;
+  disciplina_id: string;
+  topico_id: string | null;
   mastery: number;
-  minutos: number;
-  is_primeiro_contato: boolean;
-  criado_em: string;
+  created_at: string;
 }
 
-export interface TopicWithMastery extends Topic {
-  mastery: number;
-  movingAverageMastery: number;
-  tier: TopicTier;
-  ultimoContatoDias: number | null;
-  isPrimeiroContato: boolean;
-}
-
-export interface AllocatedTopic {
-  topic: TopicWithMastery;
-  minutos: number;
-  isManutencao: boolean;
-}
-
-export interface DisciplinaScore {
-  disciplinaId: DisciplineId;
-  nome: string;
-  pesoEdital: number;
+export interface DisciplinaData {
+  discipline: Discipline;
+  topics: Topic[];
+  lancamentos: Lancamento[];
   dominioMedio: number;
-  diasDesdeUltimaRevisao: number;
+  topicosNaoDominados: number;
   fatorEsquecimento: number;
   multiplicadorUrgencia: number;
-  vezesPulada: number;
   score: number;
-  motivoPrioridade: string;
 }
 
-export type TopicTier = "ruim" | "medio" | "bom" | "otimo" | "dominado";
-
-export const TIER_THRESHOLDS = { bom: 60, otimo: 80, dominado: 90 } as const;
-
-export function tierFromMastery(mastery: number): TopicTier {
-  if (mastery >= 90) return "dominado";
-  if (mastery >= 80) return "otimo";
-  if (mastery >= 60) return "bom";
-  if (mastery >= 40) return "medio";
-  return "ruim";
+export function tierFromMastery(mastery: number): Tier {
+  if (mastery < 30) return "ruim";
+  if (mastery < 60) return "medio";
+  if (mastery < 85) return "bom";
+  return "otimo";
 }
 
-const MINUTOS_POR_TOPICO_NOVO = 25;
-const MINUTOS_POR_TOPICO_REVISAO = 12;
-const MINUTOS_MANUTENCAO = 7;
-const DIAS_RESSURGIMENTO_DOMINADO = 25;
-const MAX_PESO_EDITAL = 10;
-
-export function fatorEsquecimento(dias: number): number {
-  return Math.min(2.5, 1 + dias / 5);
+export function fatorEsquecimento(lancamentos: Lancamento[]): number {
+  if (lancamentos.length === 0) return 1.5;
+  const last = lancamentos
+    .map((l) => new Date(l.created_at).getTime())
+    .sort((a, b) => b - a)[0];
+  const days = (Date.now() - last) / (1000 * 60 * 60 * 24);
+  if (days > 25) return 1.5;
+  if (days > 15) return 1.3;
+  if (days > 7) return 1.15;
+  if (days > 3) return 1.05;
+  return 1.0;
 }
 
-export function movingAverage(masteryValues: number[]): number {
-  if (masteryValues.length === 0) return 0;
-  const window = masteryValues.slice(-5);
-  return window.reduce((a, b) => a + b, 0) / window.length;
+export function dominioMedio(lancamentos: Lancamento[]): number {
+  if (lancamentos.length === 0) return 0;
+  const byTopic = new Map<string, number[]>();
+  for (const l of lancamentos) {
+    const key = l.topico_id ?? "_disc";
+    if (!byTopic.has(key)) byTopic.set(key, []);
+    byTopic.get(key)!.push(l.mastery);
+  }
+  let sum = 0;
+  for (const arr of byTopic.values()) {
+    sum += arr.reduce((a, b) => a + b, 0) / arr.length;
+  }
+  return sum / byTopic.size;
 }
 
-export function diasDesde(dateStr: string): number {
-  const diff = Date.now() - new Date(dateStr).getTime();
-  return Math.floor(diff / (1000 * 60 * 60 * 24));
+export function topicosParaFlashcards(
+  topics: Topic[],
+  lancamentos: Lancamento[]
+): Topic[] {
+  const byTopic = new Map<string, number[]>();
+  for (const l of lancamentos) {
+    if (!l.topico_id) continue;
+    if (!byTopic.has(l.topico_id)) byTopic.set(l.topico_id, []);
+    byTopic.get(l.topico_id)!.push(l.mastery);
+  }
+  return topics.filter((t) => {
+    const arr = byTopic.get(t.id);
+    if (!arr || arr.length === 0) return true;
+    const avg = arr.reduce((a, b) => a + b, 0) / arr.length;
+    return avg < MASTERY_THRESHOLD;
+  });
 }
 
-export interface DisciplinaComTopicos {
-  disciplina: Discipline;
-  topicos: TopicWithMastery[];
-  dominioMedio: number;
-  diasDesdeUltimaRevisao: number;
-  topicosAbaixoBom: number;
+export function maxTopicsForDiscipline(disciplinaData: DisciplinaData): number {
+  const naoDominados = disciplinaData.topicosNaoDominados;
+  if (naoDominados >= 3) return MAX_TOPICS_PER_SESSION;
+  if (naoDominados === 2) return 2;
+  return MIN_TOPICS_PER_SESSION;
 }
 
-export function computeTopicMastery(topic: Topic, lancamentos: Lancamento[]): TopicWithMastery {
-  const topicLanc = lancamentos
-    .filter((l) => l.topico_id === topic.id)
-    .sort((a, b) => new Date(a.criado_em).getTime() - new Date(b.criado_em).getTime());
-  const masteryValues = topicLanc.map((l) => l.mastery);
-  const latestMastery = masteryValues.length > 0 ? masteryValues[masteryValues.length - 1] : 0;
-  const mAvg = movingAverage(masteryValues);
-  const ultimo = topicLanc.length > 0 ? topicLanc[topicLanc.length - 1] : null;
-  const ultimoContatoDias = ultimo ? diasDesde(ultimo.criado_em) : null;
-  return {
-    ...topic,
-    mastery: latestMastery,
-    movingAverageMastery: mAvg,
-    tier: tierFromMastery(mAvg),
-    ultimoContatoDias,
-    isPrimeiroContato: topicLanc.length === 0,
-  };
-}
-
-export function computeDisciplinaData(disciplina: Discipline, topics: Topic[], lancamentos: Lancamento[]): DisciplinaComTopicos {
-  const topicos = topics.map((t) => computeTopicMastery(t, lancamentos));
-  const dominioMedio = topicos.length > 0 ? topicos.reduce((s, t) => s + t.movingAverageMastery, 0) / topicos.length : 0;
-  const discLanc = lancamentos
-    .filter((l) => l.disciplina_id === disciplina.id)
-    .sort((a, b) => new Date(b.criado_em).getTime() - new Date(a.criado_em).getTime());
-  const diasDesdeUltimaRevisao = discLanc.length > 0 ? diasDesde(discLanc[0].criado_em) : 9999;
-  const topicosAbaixoBom = topicos.filter((t) => t.tier !== "bom" && t.tier !== "otimo" && t.tier !== "dominado").length;
-  return { disciplina, topicos, dominioMedio, diasDesdeUltimaRevisao, topicosAbaixoBom };
+export function allocateTopics(
+  topics: Topic[],
+  lancamentos: Lancamento[],
+  max: number
+): Topic[] {
+  const byTopic = new Map<string, Lancamento[]>();
+  for (const l of lancamentos) {
+    if (!l.topico_id) continue;
+    if (!byTopic.has(l.topico_id)) byTopic.set(l.topico_id, []);
+    byTopic.get(l.topico_id)!.push(l);
+  }
+  const withScore = topics.map((t) => {
+    const arr = byTopic.get(t.id) ?? [];
+    const avg = arr.length > 0 ? arr.reduce((a, b) => a + b.mastery, 0) / arr.length : 0;
+    const lastDate = arr.length > 0
+      ? arr.map((l) => new Date(l.created_at).getTime()).sort((a, b) => b - a)[0]
+      : 0;
+    const daysSince = lastDate ? (Date.now() - lastDate) / (1000 * 60 * 60 * 24) : 999;
+    return { topic: t, avg, daysSince };
+  });
+  withScore.sort((a, b) => {
+    if (a.avg !== b.avg) return a.avg - b.avg;
+    return b.daysSince - a.daysSince;
+  });
+  return withScore.slice(0, max).map((x) => x.topic);
 }
 
 export function computeScore(
-  disciplina: Discipline,
-  dominioMedio: number,
-  diasDesdeUltimaRevisao: number,
-  multiplicadorUrgencia: number = 1,
-  vezesPulada: number = 0
-): DisciplinaScore {
-  const pesoNormalizado = disciplina.peso_edital / MAX_PESO_EDITAL;
-  const dias = diasDesdeUltimaRevisao >= 9999 ? 0 : diasDesdeUltimaRevisao;
-  const fator = fatorEsquecimento(dias);
-  const score = pesoNormalizado * (1 - dominioMedio / 100) * fator * multiplicadorUrgencia;
-  const motivo = `peso ${disciplina.peso_edital} no edital, domínio médio ${Math.round(dominioMedio)}%, sem revisão há ${diasDesdeUltimaRevisao >= 9999 ? "nunca" : diasDesdeUltimaRevisao + " dias"}${vezesPulada > 0 ? `, pulada ${vezesPulada}x` : ""}`;
+  pesoEdital: number,
+  dominioMedioVal: number,
+  fatorEsquecimentoVal: number,
+  multiplicadorUrgencia: number
+): number {
+  const pesoNormalizado = pesoEdital / MAX_PESO_EDITAL;
+  return pesoNormalizado * (1 - dominioMedioVal / 100) * fatorEsquecimentoVal * multiplicadorUrgencia;
+}
+
+export function computeDisciplinaData(
+  discipline: Discipline,
+  topics: Topic[],
+  lancamentos: Lancamento[],
+  multiplicadorUrgencia: number = 1
+): DisciplinaData {
+  const dom = dominioMedio(lancamentos);
+  const fe = fatorEsquecimento(lancamentos);
+  const naoDominados = topics.filter((t) => {
+    const arr = lancamentos.filter((l) => l.topico_id === t.id);
+    if (arr.length === 0) return true;
+    const avg = arr.reduce((a, b) => a + b.mastery, 0) / arr.length;
+    return avg < MASTERY_THRESHOLD;
+  }).length;
+  const score = computeScore(discipline.peso_edital, dom, fe, multiplicadorUrgencia);
   return {
-    disciplinaId: disciplina.id, nome: disciplina.nome, pesoEdital: disciplina.peso_edital,
-    dominioMedio, diasDesdeUltimaRevisao: dias, fatorEsquecimento: fator,
-    multiplicadorUrgencia, vezesPulada, score, motivoPrioridade: motivo,
+    discipline,
+    topics,
+    lancamentos,
+    dominioMedio: dom,
+    topicosNaoDominados: naoDominados,
+    fatorEsquecimento: fe,
+    multiplicadorUrgencia,
+    score,
   };
 }
 
 export function nextHeroDiscipline(
-  disciplinas: DisciplinaComTopicos[],
-  skipData: Map<DisciplineId, { vezes_pulada: number; multiplicador_urgencia: number }>,
-  excludeDisciplinaId?: DisciplineId | null
-): DisciplinaScore | null {
-  if (disciplinas.length === 0) return null;
-  const candidates = excludeDisciplinaId ? disciplinas.filter((d) => d.disciplina.id !== excludeDisciplinaId) : disciplinas;
+  allData: DisciplinaData[],
+  excludeDisciplinaId?: string
+): DisciplinaData | null {
+  const candidates = allData.filter((d) => d.discipline.id !== excludeDisciplinaId);
   if (candidates.length === 0) return null;
-  const scores = candidates.map((d) => {
-    const skip = skipData.get(d.disciplina.id);
-    return computeScore(d.disciplina, d.dominioMedio, d.diasDesdeUltimaRevisao, skip?.multiplicador_urgencia ?? 1, skip?.vezes_pulada ?? 0);
-  });
-  scores.sort((a, b) => b.score - a.score);
-  return scores[0];
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates[0];
 }
-
-export function maxTopicsForDiscipline(d: DisciplinaComTopicos): number {
-  return Math.min(3, Math.max(1, d.topicosAbaixoBom));
-}
-
-export function allocateTopics(d: DisciplinaComTopicos, minutosTotal: number = 45): AllocatedTopic[] {
-  const max = maxTopicsForDiscipline(d);
-  const tecto = Math.min(max, d.topicos.length);
-  const naoDominados = d.topicos.filter((t) => t.tier !== "dominado").sort((a, b) => a.movingAverageMastery - b.movingAverageMastery);
-  const dominadosParaRessurgir = d.topicos
-    .filter((t) => t.tier === "dominado" && t.ultimoContatoDias !== null && t.ultimoContatoDias >= DIAS_RESSURGIMENTO_DOMINADO)
-    .sort((a, b) => (b.ultimoContatoDias ?? 0) - (a.ultimoContatoDias ?? 0));
-  const slotsPrincipais = Math.max(1, tecto - (dominadosParaRessurgir.length > 0 ? 1 : 0));
-  const principais = naoDominados.slice(0, slotsPrincipais);
-  const manutencao = dominadosParaRessurgir.slice(0, 1);
-  const minutosManutencao = manutencao.length * MINUTOS_MANUTENCAO;
-  const minutosDisponiveis = Math.max(0, minutosTotal - minutosManutencao);
-  const minutosPorTopico = principais.length > 0 ? Math.floor(minutosDisponiveis / principais.length) : 0;
-  const allocated: AllocatedTopic[] = principais.map((t) => ({
-    topic: t, minutos: t.isPrimeiroContato ? MINUTOS_POR_TOPICO_NOVO : MINUTOS_POR_TOPICO_REVISAO, isManutencao: false,
-  }));
-  manutencao.forEach((t) => { allocated.push({ topic: t, minutos: MINUTOS_MANUTENCAO, isManutencao: true }); });
-  return allocated;
-}
-
-export function topicosParaFlashcards(disciplinas: DisciplinaComTopicos[]): { topicoId: string; disciplinaId: string; topicoNome: string }[] {
-  const result: { topicoId: string; disciplinaId: string; topicoNome: string }[] = [];
-  for (const d of disciplinas) {
-    for (const t of d.topicos) {
-      if (t.movingAverageMastery < TIER_THRESHOLDS.bom) {
-        result.push({ topicoId: t.id, disciplinaId: d.disciplina.id, topicoNome: t.nome });
-      }
-    }
-  }
-  return result;
-}
-
-export const PROJECTION_NOTE = "Estimativa baseada no seu ritmo médio real de estudo. Não considera revisões, apenas o primeiro contato com cada tópico.";

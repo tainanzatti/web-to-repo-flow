@@ -1,32 +1,84 @@
-import { callAI, type AIKind, type FlashcardPair, type RedacaoCorrecaoResult } from "./ai-client";
-import { fetchAiMaterial, upsertAiMaterial, insertFlashcards, deleteFlashcardsByTopico } from "./db";
+import { generateFlashcardsAI, generateRedacaoTemaAI, corrigirRedacaoAI } from "./ai-client";
+import { fetchAIMaterial, insertAIMaterial, insertFlashcards, type FlashcardRow } from "./db";
 
-export type { AIKind, FlashcardPair, RedacaoCorrecaoResult };
-
-interface TopicContext { topicoId: string; topicoNome: string; disciplinaId: string; disciplinaNome: string; }
-
-export async function fetchOrGenerateFlashcards(ctx: TopicContext): Promise<FlashcardPair[]> {
-  const cached = await fetchAiMaterial(ctx.topicoId, "flashcards");
-  if (cached?.content_json?.flashcards) return cached.content_json.flashcards as FlashcardPair[];
-  const result = await callAI<{ flashcards: FlashcardPair[] }>("flashcards", { topicoNome: ctx.topicoNome, disciplinaNome: ctx.disciplinaNome });
-  await upsertAiMaterial(ctx.disciplinaId, ctx.topicoId, "flashcards", result as Record<string, unknown>);
-  return result.flashcards;
+export async function fetchOrGenerateFlashcards(
+  disciplinaId: string,
+  disciplinaNome: string,
+  topicoId: string,
+  topicoNome: string
+): Promise<FlashcardRow[]> {
+  const cached = await fetchAIMaterial(topicoId, "flashcards");
+  if (cached) {
+    try {
+      const parsed = JSON.parse(cached.conteudo) as FlashcardRow[];
+      return parsed;
+    } catch {
+      // fall through to generation
+    }
+  }
+  const { data, error } = await generateFlashcardsAI(disciplinaNome, topicoNome);
+  if (error || !data) return [];
+  await insertAIMaterial(disciplinaId, topicoId, "flashcards", data);
+  try {
+    const cards = JSON.parse(data) as { pergunta: string; resposta: string }[];
+    const rows = await insertFlashcards(
+      cards.map((c) => ({
+        disciplina_id: disciplinaId,
+        topico_id: topicoId,
+        pergunta: c.pergunta,
+        resposta: c.resposta,
+      }))
+    );
+    return rows;
+  } catch {
+    return [];
+  }
 }
 
-export async function ensureFlashcardsForTopic(ctx: TopicContext): Promise<void> {
-  const pairs = await fetchOrGenerateFlashcards(ctx);
-  await deleteFlashcardsByTopico(ctx.topicoId);
-  await insertFlashcards(pairs.map((p) => ({ disciplina_id: ctx.disciplinaId, topico_id: ctx.topicoId, pergunta: p.pergunta, resposta: p.resposta })));
+export async function ensureFlashcardsForTopic(
+  disciplinaId: string,
+  disciplinaNome: string,
+  topicoId: string,
+  topicoNome: string
+): Promise<void> {
+  const cached = await fetchAIMaterial(topicoId, "flashcards");
+  if (cached) return;
+  const { data, error } = await generateFlashcardsAI(disciplinaNome, topicoNome);
+  if (error || !data) return;
+  await insertAIMaterial(disciplinaId, topicoId, "flashcards", data);
+  try {
+    const cards = JSON.parse(data) as { pergunta: string; resposta: string }[];
+    await insertFlashcards(
+      cards.map((c) => ({
+        disciplina_id: disciplinaId,
+        topico_id: topicoId,
+        pergunta: c.pergunta,
+        resposta: c.resposta,
+      }))
+    );
+  } catch {
+    // ignore parse errors
+  }
 }
 
-export async function generateRedacaoTema(): Promise<{ tema: string; proposta: string }> {
-  const cached = await fetchAiMaterial("redacao", "redacao-tema");
-  if (cached?.content_json?.tema) return cached.content_json as { tema: string; proposta: string };
-  const result = await callAI<{ tema: string; proposta: string }>("redacao-tema", {});
-  await upsertAiMaterial("redacao", "redacao", "redacao-tema", result as Record<string, unknown>);
-  return result;
+export async function generateRedacaoTema(): Promise<string> {
+  const { data, error } = await generateRedacaoTemaAI();
+  if (error || !data) return "Tema não disponível no momento";
+  return data;
 }
 
-export async function corrigirRedacao(texto: string): Promise<RedacaoCorrecaoResult> {
-  return await callAI<RedacaoCorrecaoResult>("redacao-correcao", { textoRedacao: texto });
+export interface RedacaoCorrecao {
+  nota: number;
+  correcao: string;
+}
+
+export async function corrigirRedacao(tema: string, texto: string): Promise<RedacaoCorrecao | null> {
+  const { data, error } = await corrigirRedacaoAI(tema, texto);
+  if (error || !data) return null;
+  try {
+    const parsed = JSON.parse(data) as RedacaoCorrecao;
+    return parsed;
+  } catch {
+    return null;
+  }
 }

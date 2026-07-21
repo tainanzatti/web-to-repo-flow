@@ -19,6 +19,10 @@ body { font-family: "Inter", system-ui, sans-serif; background-color: #f7f8fa; c
 .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
 @keyframes flipIn { from { opacity: 0; transform: rotateY(90deg); } to { opacity: 1; transform: rotateY(0); } }
 .animate-flipIn { animation: flipIn 0.4s ease-out; }
+@keyframes slideIn { from { opacity: 0; transform: translateX(20px); } to { opacity: 1; transform: translateX(0); } }
+.animate-slideIn { animation: slideIn 0.35s ease-out; }
+@keyframes slideOut { from { opacity: 1; transform: translateX(0); } to { opacity: 0; transform: translateX(-20px); } }
+.animate-slideOut { animation: slideOut 0.25s ease-in; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }
