@@ -34,13 +34,9 @@ function App() {
 
   return (
     <div className="app-layout">
-      {view !== 'foco' && (
-        <Sidebar current={view} onNavigate={setView} />
-      )}
+      {view !== 'foco' && <Sidebar current={view} onNavigate={setView} />}
       <main className="app-main">
-        {view === 'painel' && (
-          <PainelView onNavigate={(v) => setView(v)} />
-        )}
+        {view === 'painel' && <PainelView onNavigate={(v) => setView(v)} />}
         {view === 'nucleo' && <NucleoView onStudy={handleStudy} />}
         {view === 'flashcards' && <FlashcardsView />}
         {view === 'desempenho' && <DesempenhoView />}
@@ -49,7 +45,6 @@ function App() {
         {view === 'perfil' && <PerfilView />}
         {view === 'foco' && <FocoView onExit={() => setView('painel')} />}
       </main>
-
       {studyTarget && studyDiscipline && (
         <MaterialModal
           discipline={studyDiscipline}

@@ -1,12 +1,6 @@
 import { useEffect, useState, useMemo } from 'react'
 import {
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
-  ResponsiveContainer,
-  Tooltip,
+  RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, ResponsiveContainer, Tooltip,
 } from 'recharts'
 import { fetchDisciplines, fetchAllTopics, fetchLancamentos } from '../../lib/db'
 import type { Discipline, Topic, Lancamento } from '../../lib/types'
@@ -19,88 +13,39 @@ export default function ComparativoView() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    Promise.all([
-      fetchDisciplines(),
-      fetchAllTopics(),
-      fetchLancamentos(),
-    ]).then(([d, t, l]) => {
-      setDisciplines(d)
-      setTopics(t)
-      setLancamentos(l)
-      setLoading(false)
-    })
+    Promise.all([fetchDisciplines(), fetchAllTopics(), fetchLancamentos()])
+      .then(([d, t, l]) => { setDisciplines(d); setTopics(t); setLancamentos(l); setLoading(false) })
   }, [])
 
   const chartData = useMemo(() => {
-    return disciplines
-      .filter((d) => !d.is_redacao)
-      .map((d) => {
-        const dm = computeDisciplineMastery(d, topics, lancamentos)
-        return {
-          subject: d.nome.length > 18 ? d.nome.slice(0, 16) + '…' : d.nome,
-          domínio: Math.round(dm.masteryMedio),
-          peso: d.peso_edital * 10,
-        }
-      })
+    return disciplines.filter((d) => !d.is_redacao).map((d) => {
+      const dm = computeDisciplineMastery(d, topics, lancamentos)
+      return { subject: d.nome.length > 18 ? d.nome.slice(0, 16) + '…' : d.nome, dominio: Math.round(dm.masteryMedio), peso: d.peso_edital * 10 }
+    })
   }, [disciplines, topics, lancamentos])
 
-  if (loading) {
-    return <div className="loading-spinner">Carregando comparativo...</div>
-  }
+  if (loading) return <div className="loading-spinner">Carregando comparativo...</div>
 
   return (
     <div className="view-container">
       <div className="view-header">
         <h1 className="view-title">Comparativo</h1>
-        <p className="view-subtitle">
-          Radar de domínio entre disciplinas (azul) sobreposto ao peso no edital
-          (verde).
-        </p>
+        <p className="view-subtitle">Radar de domínio entre disciplinas (azul) sobreposto ao peso no edital (verde).</p>
       </div>
-
       <div className="card" style={{ padding: 24 }}>
         <ResponsiveContainer width="100%" height={450}>
           <RadarChart data={chartData}>
             <PolarGrid stroke="var(--border)" />
-            <PolarAngleAxis
-              dataKey="subject"
-              tick={{ fill: 'var(--text-secondary)', fontSize: 12 }}
-            />
-            <PolarRadiusAxis
-              domain={[0, 100]}
-              tick={{ fill: 'var(--text-muted)', fontSize: 10 }}
-              stroke="var(--border)"
-            />
-            <Radar
-              name="Domínio"
-              dataKey="domínio"
-              stroke="var(--primary)"
-              fill="var(--primary)"
-              fillOpacity={0.3}
-            />
-            <Radar
-              name="Peso edital (×10)"
-              dataKey="peso"
-              stroke="var(--success)"
-              fill="var(--success)"
-              fillOpacity={0.15}
-            />
-            <Tooltip
-              contentStyle={{
-                background: 'var(--bg-elevated)',
-                border: '1px solid var(--border-light)',
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            />
+            <PolarAngleAxis dataKey="subject" tick={{ fill: 'var(--text-secondary)', fontSize: 12 }} />
+            <PolarRadiusAxis domain={[0, 100]} tick={{ fill: 'var(--text-muted)', fontSize: 10 }} stroke="var(--border)" />
+            <Radar name="Domínio" dataKey="dominio" stroke="var(--primary)" fill="var(--primary)" fillOpacity={0.3} />
+            <Radar name="Peso edital (×10)" dataKey="peso" stroke="var(--success)" fill="var(--success)" fillOpacity={0.15} />
+            <Tooltip contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-light)', borderRadius: 8, fontSize: 13 }} />
           </RadarChart>
         </ResponsiveContainer>
       </div>
-
       <div className="card" style={{ marginTop: 20 }}>
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>
-          Heatmap de dias estudados
-        </h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 12 }}>Heatmap de dias estudados</h3>
         <Heatmap lancamentos={lancamentos} />
       </div>
     </div>
@@ -147,16 +92,7 @@ function Heatmap({ lancamentos }: { lancamentos: Lancamento[] }) {
       {weeks.map((week, wi) => (
         <div key={wi} style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
           {week.map((day) => (
-            <div
-              key={day.date}
-              title={`${day.date}: ${day.minutes} min`}
-              style={{
-                width: 14,
-                height: 14,
-                borderRadius: 3,
-                background: colorFor(day.minutes),
-              }}
-            />
+            <div key={day.date} title={`${day.date}: ${day.minutes} min`} style={{ width: 14, height: 14, borderRadius: 3, background: colorFor(day.minutes) }} />
           ))}
         </div>
       ))}

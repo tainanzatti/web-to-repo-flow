@@ -1,19 +1,14 @@
-import { callLovableAI, extractJSON, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
-
-const SYSTEM_PROMPT = "Você é um orientador de estudos especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC). Crie um plano de estudos personalizado. Responda APENAS com JSON válido.";
+import { corsHeaders, errorResponse, jsonResponse, parseBody, callGeminiJSON } from '../_shared/ai.ts'
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return optionsResponse();
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   try {
-    const { dias, horas_por_dia, disciplinas, nivel } = await req.json();
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Crie um plano de estudos para ${dias} dias, ${horas_por_dia} horas por dia, disciplinas: ${disciplinas?.join(", ") ?? "todas"}, nível: ${nivel ?? "intermediário"}. Responda em JSON: {"plano": string}` },
-    ];
-    const raw = await callLovableAI(messages, { jsonMode: true, temperature: 0.5 });
-    const parsed = extractJSON<{ plano: string }>(raw);
-    return successResponse(parsed);
-  } catch (err) {
-    return errorResponse(500, (err as Error).message);
+    const body = await parseBody(req)
+    const { horas_disponiveis, disciplinas } = body as { horas_disponiveis?: number; disciplinas?: string }
+    const prompt = `Gere um plano de estudo para hoje com ${horas_disponiveis ?? 2} horas. Disciplinas: ${disciplinas ?? 'todas'}. Responda APENAS com JSON: {"plano":[{"disciplina":"...","topico":"...","minutos":30}]}`
+    const data = await callGeminiJSON(prompt, 'Você é um orientador de concursos. Monte planos realistas.')
+    return jsonResponse(data)
+  } catch (e) {
+    return errorResponse(500, String(e))
   }
-});
+})

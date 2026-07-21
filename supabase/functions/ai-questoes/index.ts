@@ -1,20 +1,14 @@
-import { callLovableAI, extractJSON, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
-
-const SYSTEM_PROMPT = "Você é um professor especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC), banca AOCP. Gere questões de múltipla escolha (5 alternativas A-E) no estilo AOCP. Responda APENAS com JSON válido.";
+import { corsHeaders, errorResponse, jsonResponse, parseBody, callGeminiJSON } from '../_shared/ai.ts'
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return optionsResponse();
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   try {
-    const { disciplina, topico, quantidade } = await req.json();
-    const qtd = Math.min(quantidade ?? 5, 10);
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Gere ${qtd} questões sobre "${topico}" da disciplina "${disciplina}". Cada questão deve ter: enunciado, alternativa_a, alternativa_b, alternativa_c, alternativa_d, alternativa_e, resposta_correta (A/B/C/D/E), explicacao. Responda em JSON: {"questoes": [...]}` },
-    ];
-    const raw = await callLovableAI(messages, { jsonMode: true, temperature: 0.8 });
-    const parsed = extractJSON<{ questoes: unknown[] }>(raw);
-    return successResponse(parsed);
-  } catch (err) {
-    return errorResponse(500, (err as Error).message);
+    const body = await parseBody(req)
+    const { topico_nome, disciplina_nome } = body as { topico_nome?: string; disciplina_nome?: string }
+    const prompt = `Gere 5 a 10 pares de flashcards (pergunta e resposta objetivas) sobre "${topico_nome ?? 'o tema'}" na disciplina "${disciplina_nome ?? ''}" para concurso de Soldado da PMSC 2026 (banca AOCP). Responda APENAS com JSON no formato: {"flashcards":[{"pergunta":"...","resposta":"..."}]}`
+    const data = await callGeminiJSON<{ flashcards: Array<{ pergunta: string; resposta: string }> }>(prompt, 'Você é um professor de concursos. Gere flashcards curtos e objetivos.')
+    return jsonResponse(data)
+  } catch (e) {
+    return errorResponse(500, String(e))
   }
-});
+})

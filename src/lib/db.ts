@@ -283,7 +283,6 @@ export async function upsertProfile(
       nome: profile.nome ?? 'Concurseiro',
       email: profile.email ?? '',
       ...profile,
-      user_id: USER_ID,
     })
     if (error) throw error
   }

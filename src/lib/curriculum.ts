@@ -33,7 +33,6 @@ export type DisciplineScore = {
 }
 
 const RESURGIR_DIAS = 25
-const RESURGIR_MIN_MASTERY = 80
 
 export function computeTopicMastery(
   topic: Topic,
@@ -60,10 +59,7 @@ export function computeTopicMastery(
   }
 }
 
-function tierFor(
-  mastery: number,
-  isFirst: boolean,
-): TopicMastery['tier'] {
+function tierFor(mastery: number, isFirst: boolean): TopicMastery['tier'] {
   if (isFirst) return 'nao_iniciado'
   if (mastery < 25) return 'iniciado'
   if (mastery < 50) return 'medio'
@@ -129,13 +125,10 @@ export function computeAllScores(
     const dominioNorm = dm.masteryMedio / 100
     const dias = dm.daysSinceReview ?? 9999
     const fatorEsquecimento = Math.min(2.5, 1 + dias / 5)
-    const skip = skipCounts.find(
-      (s) => s.disciplina_id === dm.discipline.id,
-    )
+    const skip = skipCounts.find((s) => s.disciplina_id === dm.discipline.id)
     const multiplicador = skip ? Number(skip.multiplicador_urgencia) : 1
     const vezesPulada = skip ? skip.vezes_pulada : 0
-    const score =
-      pesoNorm * (1 - dominioNorm) * fatorEsquecimento * multiplicador
+    const score = pesoNorm * (1 - dominioNorm) * fatorEsquecimento * multiplicador
     return {
       discipline: dm.discipline,
       score: Math.round(score * 100) / 100,
@@ -145,7 +138,7 @@ export function computeAllScores(
       diasSemRevisao: dm.daysSinceReview,
       multiplicadorUrgencia: multiplicador,
       vezesPulada,
-      motivo: buildMotivo(dm, pesoNorm, fatorEsquecimento, dias, vezesPulada),
+      motivo: buildMotivo(dm, fatorEsquecimento, dias, vezesPulada),
     }
   })
   return scores.sort((a, b) => b.score - a.score)
@@ -153,7 +146,6 @@ export function computeAllScores(
 
 function buildMotivo(
   dm: DisciplineMastery,
-  pesoNorm: number,
   fatorEsc: number,
   dias: number,
   vezesPulada: number,

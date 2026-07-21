@@ -1,18 +1,14 @@
-import { callLovableAI, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
-
-const SYSTEM_PROMPT = "Você é um professor especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC), banca AOCP. Gere um resumo claro e didático do conteúdo.";
+import { corsHeaders, errorResponse, jsonResponse, parseBody, callGemini } from '../_shared/ai.ts'
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return optionsResponse();
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   try {
-    const { conteudo } = await req.json();
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Gere um resumo do seguinte conteúdo:\n\n${conteudo}` },
-    ];
-    const resumo = await callLovableAI(messages);
-    return successResponse({ resumo });
-  } catch (err) {
-    return errorResponse(500, (err as Error).message);
+    const body = await parseBody(req)
+    const { topico_nome, disciplina_nome } = body as { topico_nome?: string; disciplina_nome?: string }
+    const prompt = `Gere um resumo de estudo objetivo e completo sobre "${topico_nome ?? 'o tema'}" na disciplina "${disciplina_nome ?? ''}" para concurso de Soldado da PMSC 2026 (banca AOCP). Estruture em tópicos claros, destaque pontos mais cobrados. Responda em português.`
+    const text = await callGemini(prompt, 'Você é um professor especializado em concursos públicos brasileiros. Gere resumos claros, objetivos e bem estruturados.')
+    return jsonResponse({ texto: text })
+  } catch (e) {
+    return errorResponse(500, String(e))
   }
-});
+})

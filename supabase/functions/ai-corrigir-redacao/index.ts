@@ -1,19 +1,14 @@
-import { callLovableAI, extractJSON, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
-
-const SYSTEM_PROMPT = "Você é um corretor de redações especialista em concursos públicos. Avalie a redação com notas de 0 a 10 em cada critério. Responda APENAS com JSON válido.";
+import { corsHeaders, errorResponse, jsonResponse, parseBody, callGeminiJSON } from '../_shared/ai.ts'
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return optionsResponse();
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   try {
-    const { tema, conteudo } = await req.json();
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Tema: ${tema}\n\nRedação:\n${conteudo}\n\nAvalie a redação com os critérios: Adequação ao tema, Coesão e Coerência, Gramática e Ortografia, Argumentação. Dê nota 0-10 para cada critério e um feedback geral. Responda em JSON: {"nota": number, "criterios": [{"nome": string, "nota": number, "comentario": string}], "feedback": string}` },
-    ];
-    const raw = await callLovableAI(messages, { jsonMode: true, temperature: 0.3 });
-    const parsed = extractJSON<{ nota: number; criterios: { nome: string; nota: number; comentario: string }[]; feedback: string }>(raw);
-    return successResponse(parsed);
-  } catch (err) {
-    return errorResponse(500, (err as Error).message);
+    const body = await parseBody(req)
+    const { tema, texto } = body as { tema?: string; texto?: string }
+    const prompt = `Corrija a seguinte redação dissertativo-argumentativa para concurso de Soldado da PMSC 2026.\n\nTema: ${tema ?? ''}\n\nRedação:\n${texto ?? ''}\n\nAvalie por critérios: compreensao_do_tema, argumentacao, estrutura_coesao, norma_culta, conclusao_proposta. Dê nota de 0 a 10. Responda APENAS com JSON: {"nota":7.5,"feedback":{"compreensao_do_tema":"...","argumentacao":"...","estrutura_coesao":"...","norma_culta":"...","conclusao_proposta":"..."}}`
+    const data = await callGeminiJSON<{ nota: number; feedback: Record<string, string> }>(prompt, 'Você é um corretor de redação para concursos públicos. Seja rigoroso mas justo.')
+    return jsonResponse(data)
+  } catch (e) {
+    return errorResponse(500, String(e))
   }
-});
+})

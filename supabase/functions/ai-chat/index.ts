@@ -1,21 +1,14 @@
-import { callLovableAI, corsHeaders, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
-
-const SYSTEM_PROMPT = "Você é um professor especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC), banca AOCP. Sua missão é ajudar o aluno com explicações claras, questões no estilo AOCP, correções de redação e orientações de estudo. Sempre use linguagem didática, precisa e motivadora.";
+import { corsHeaders, errorResponse, jsonResponse, parseBody, callGemini } from '../_shared/ai.ts'
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return optionsResponse();
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   try {
-    const { messages, context } = await req.json();
-    const ctxMsg = context?.disciplina || context?.topico
-      ? `\n\nContexto: Disciplina: ${context.disciplina ?? "—"}, Tópico: ${context.topico ?? "—"}`
-      : "";
-    const fullMessages = [
-      { role: "system", content: SYSTEM_PROMPT + ctxMsg },
-      ...messages,
-    ];
-    const resposta = await callLovableAI(fullMessages);
-    return successResponse({ resposta });
-  } catch (err) {
-    return errorResponse(500, (err as Error).message);
+    const body = await parseBody(req)
+    const { pergunta } = body as { pergunta?: string }
+    const prompt = pergunta ?? 'Olá'
+    const text = await callGemini(prompt, 'Você é um assistente de estudos para concurso de Soldado da PMSC 2026 (banca AOCP). Responda de forma clara e objetiva em português.')
+    return jsonResponse({ resposta: text })
+  } catch (e) {
+    return errorResponse(500, String(e))
   }
-});
+})

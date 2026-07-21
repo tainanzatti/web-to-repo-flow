@@ -1,18 +1,12 @@
-import { callLovableAI, optionsResponse, errorResponse, successResponse } from "../_shared/lovable-ai.ts";
-
-const SYSTEM_PROMPT = "Você é um professor especialista em concursos públicos, com foco no concurso da Polícia Militar de Santa Catarina (PMSC), banca AOCP. Gere temas de redação no estilo dos concursos da PMSC.";
+import { corsHeaders, errorResponse, jsonResponse, parseBody, callGeminiJSON } from '../_shared/ai.ts'
 
 Deno.serve(async (req: Request) => {
-  if (req.method === "OPTIONS") return optionsResponse();
+  if (req.method === 'OPTIONS') return new Response(null, { status: 200, headers: corsHeaders })
   try {
-    const { area } = await req.json();
-    const messages = [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: `Gere um tema de redação para concurso${area ? ` na área de ${area}` : ""}. Responda apenas com o tema, sem explicações adicionais.` },
-    ];
-    const tema = await callLovableAI(messages, { temperature: 0.8 });
-    return successResponse({ tema: tema.trim() });
-  } catch (err) {
-    return errorResponse(500, (err as Error).message);
+    const prompt = `Gere um tema de redação dissertativo-argumentativa para concurso de Soldado da PMSC 2026, baseado em assuntos de segurança pública, direitos humanos, cidadania e atualidades. O tema deve ser atual e relevante. Responda APENAS com JSON: {"tema":"...","proposta":"..."}`
+    const data = await callGeminiJSON<{ tema: string; proposta: string }>(prompt, 'Você é um professor de redação para concursos.')
+    return jsonResponse(data)
+  } catch (e) {
+    return errorResponse(500, String(e))
   }
-});
+})

@@ -73,15 +73,6 @@ export type AiMaterial = {
   criado_em: string
 }
 
-export type StudySession = {
-  id: string
-  user_id: string | null
-  inicio: string
-  fim: string | null
-  duracao_segundos: number | null
-  criado_em: string
-}
-
 export type StudyTimeDaily = {
   id: string
   user_id: string | null

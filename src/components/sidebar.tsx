@@ -57,9 +57,7 @@ export default function Sidebar({ current, onNavigate }: Props) {
   useEffect(() => {
     fetchFlashcards().then((cards) => {
       const today = new Date().toISOString().slice(0, 10)
-      setPendingFlashcards(
-        cards.filter((c) => c.proxima_revisao <= today).length,
-      )
+      setPendingFlashcards(cards.filter((c) => c.proxima_revisao <= today).length)
     })
   }, [current])
 
@@ -71,7 +69,6 @@ export default function Sidebar({ current, onNavigate }: Props) {
 
   return (
     <aside
-      className="sidebar"
       style={{
         width: expanded ? 220 : 64,
         transition: 'width 200ms cubic-bezier(0.4,0,0.2,1)',
@@ -101,17 +98,11 @@ export default function Sidebar({ current, onNavigate }: Props) {
         <button
           onClick={toggle}
           title={expanded ? 'Recolher' : 'Expandir'}
-          style={{
-            color: 'var(--text-muted)',
-            padding: 4,
-            borderRadius: 6,
-            display: 'flex',
-          }}
+          style={{ color: 'var(--text-muted)', padding: 4, borderRadius: 6, display: 'flex' }}
         >
           {expanded ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}
         </button>
       </div>
-
       <nav style={{ flex: 1, padding: expanded ? '8px 12px' : '8px 0' }}>
         {NAV_ITEMS.map((item) => {
           const active = current === item.key
@@ -131,21 +122,14 @@ export default function Sidebar({ current, onNavigate }: Props) {
                 borderRadius: 8,
                 marginBottom: 2,
                 background: active ? 'rgba(59,130,246,0.12)' : 'transparent',
-                color: active
-                  ? 'var(--primary-light)'
-                  : 'var(--text-secondary)',
+                color: active ? 'var(--primary-light)' : 'var(--text-secondary)',
                 fontWeight: active ? 600 : 500,
                 fontSize: 14,
                 transition: 'all 150ms ease',
                 position: 'relative',
               }}
-              onMouseEnter={(e) => {
-                if (!active)
-                  e.currentTarget.style.background = 'var(--bg-card-hover)'
-              }}
-              onMouseLeave={(e) => {
-                if (!active) e.currentTarget.style.background = 'transparent'
-              }}
+              onMouseEnter={(e) => { if (!active) e.currentTarget.style.background = 'var(--bg-card-hover)' }}
+              onMouseLeave={(e) => { if (!active) e.currentTarget.style.background = 'transparent' }}
             >
               <Icon size={20} strokeWidth={active ? 2.2 : 1.8} />
               {expanded && <span>{item.label}</span>}
@@ -168,7 +152,6 @@ export default function Sidebar({ current, onNavigate }: Props) {
           )
         })}
       </nav>
-
       {expanded && (
         <div
           style={{
