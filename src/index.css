@@ -2,57 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-}
-
-* {
-  -webkit-tap-highlight-color: transparent;
-}
-
-body {
-  font-family: "Inter", system-ui, sans-serif;
-  background-color: #f7f8fa;
-  color: #1d2230;
-  margin: 0;
-}
+:root { color-scheme: light; }
+* { -webkit-tap-highlight-color: transparent; }
+body { font-family: "Inter", system-ui, sans-serif; background-color: #f7f8fa; color: #1d2230; margin: 0; }
 
 @layer components {
-  .card {
-    @apply rounded-2xl bg-white shadow-sm border border-ink-100;
-  }
-  .btn {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none;
-  }
-  .btn-primary {
-    @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/20;
-  }
-  .btn-secondary {
-    @apply btn bg-ink-100 text-ink-700 hover:bg-ink-200;
-  }
-  .btn-danger {
-    @apply btn bg-error-600 text-white hover:bg-error-700;
-  }
-  .btn-ghost {
-    @apply btn text-ink-600 hover:bg-ink-100;
-  }
+  .card { @apply rounded-2xl bg-white shadow-sm border border-ink-100; }
+  .btn { @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition-all active:scale-[0.97] disabled:opacity-50 disabled:pointer-events-none; }
+  .btn-primary { @apply btn bg-brand-600 text-white hover:bg-brand-700 shadow-sm shadow-brand-600/20; }
+  .btn-secondary { @apply btn bg-ink-100 text-ink-700 hover:bg-ink-200; }
+  .btn-danger { @apply btn bg-error-600 text-white hover:bg-error-700; }
+  .btn-ghost { @apply btn text-ink-600 hover:bg-ink-100; }
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-.animate-fadeIn {
-  animation: fadeIn 0.3s ease-out;
-}
-
-@keyframes flipIn {
-  from { opacity: 0; transform: rotateY(90deg); }
-  to { opacity: 1; transform: rotateY(0); }
-}
-.animate-flipIn {
-  animation: flipIn 0.4s ease-out;
-}
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+@keyframes flipIn { from { opacity: 0; transform: rotateY(90deg); } to { opacity: 1; transform: rotateY(0); } }
+.animate-flipIn { animation: flipIn 0.4s ease-out; }
 
 ::-webkit-scrollbar { width: 8px; height: 8px; }
 ::-webkit-scrollbar-track { background: transparent; }

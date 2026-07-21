@@ -14,12 +14,7 @@ export default function App() {
   const [flashcardsPendentes, setFlashcardsPendentes] = useState(0);
 
   const refreshFlashcards = useCallback(async () => {
-    try {
-      const data = await fetchFlashcardsPendentes();
-      setFlashcardsPendentes(data.length);
-    } catch {
-      // ignore — may not be loaded yet
-    }
+    try { const data = await fetchFlashcardsPendentes(); setFlashcardsPendentes(data.length); } catch { /* ignore */ }
   }, []);
 
   useEffect(() => {
