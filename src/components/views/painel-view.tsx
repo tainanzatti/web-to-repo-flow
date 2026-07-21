@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Loader2, TrendingUp, Target, Clock, BookOpen, Calculator, Sparkles, Calendar, AlertCircle, ChevronRight, Timer } from "lucide-react";
 import { fetchDisciplines, fetchAllTopics, fetchLancamentos, fetchQuestoes, fetchSkipCounts, fetchPlanoHoje, savePlanoHoje } from "../../lib/db";
 import { computeDisciplinaData, computeTopicoStats, computeDailyPlan, dominioMedio, type Discipline, type Topic, type Lancamento, type QuestaoRow, type PlanoEstudo, type Prioridade } from "../../lib/curriculum";
-import { gerarPlanoAI, type PlanoAIInput } from "../../lib/ai-client";
+import { aiGerarPlano, type PlanoAIInput } from "../../lib/ai.service";
 import { StatCard } from "../ui/StatCard";
 import { StudyTimer } from "../ui/StudyTimer";
 import { useTimer, formatTime } from "../../lib/timer-context";
@@ -36,7 +36,7 @@ export function PainelView() {
     if (gerandoPlano) return; setGerandoPlano(true); setPlanoErro(null);
     const stats = computeTopicoStats(topics, disciplines, lancamentos, questoes);
     const inputs: PlanoAIInput[] = stats.slice(0, 10).map((s) => ({ topico_id: s.topic.id, topico_nome: s.topic.nome, disciplina_nome: s.discipline.nome, mastery: s.masteryMedio, revisoes: s.revisoes, dias_desde_ultima: s.diasDesdeUltimaRevisao, questoes: s.questoesRespondidas, acertos: s.acertos, taxa_acertos: s.taxaAcertos, taxa_erros: s.taxaErros, peso_edital: s.discipline.peso_edital }));
-    const { plano: aiPlano, error } = await gerarPlanoAI(inputs);
+    const { plano: aiPlano, error } = await aiGerarPlano(inputs);
     if (error || !aiPlano) { setPlanoErro(error ?? "Erro ao gerar plano"); setGerandoPlano(false); return; }
     await savePlanoHoje(aiPlano);
     setPlano({ data: new Date().toISOString().slice(0, 10), itens: aiPlano.itens.map((i) => ({ ...i, prioridade: (["Alta", "Média", "Baixa"].includes(i.prioridade) ? i.prioridade : "Média") as Prioridade })), tempo_total: aiPlano.tempo_total });

@@ -1,23 +1,85 @@
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, BarChart3, AlertCircle } from "lucide-react";
+import { Loader2, BarChart3, AlertCircle, Sparkles, TrendingUp, Star, CheckCircle } from "lucide-react";
 import { fetchDisciplines, fetchAllTopics, fetchLancamentos, fetchQuestoes, fetchSkipCounts } from "../../lib/db";
 import { computeDisciplinaData, tierFromMastery, type Discipline, type Topic, type Lancamento, type QuestaoRow } from "../../lib/curriculum";
+import { aiAnaliseDesempenho, aiRecomendacoes, type AnaliseDesempenho } from "../../lib/ai.service";
+import { useTimer } from "../../lib/timer-context";
 
 export function DesempenhoView() {
+  const { studyStats } = useTimer();
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
   const [topics, setTopics] = useState<Topic[]>([]);
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [questoes, setQuestoes] = useState<QuestaoRow[]>([]);
   const [skipCounts, setSkipCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
-  const load = useCallback(async () => { const [d, t, l, q, s] = await Promise.all([fetchDisciplines(), fetchAllTopics(), fetchLancamentos(), fetchQuestoes(), fetchSkipCounts()]); setDisciplines(d); setTopics(t); setLancamentos(l); setQuestoes(q); setSkipCounts(s); setLoading(false); }, []);
+  const [analise, setAnalise] = useState<AnaliseDesempenho | null>(null);
+  const [analiseLoading, setAnaliseLoading] = useState(false);
+  const [analiseErro, setAnaliseErro] = useState<string | null>(null);
+  const [recomendacoes, setRecomendacoes] = useState<string[] | null>(null);
+  const [recomLoading, setRecomLoading] = useState(false);
+  const [recomErro, setRecomErro] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    const [d, t, l, q, s] = await Promise.all([fetchDisciplines(), fetchAllTopics(), fetchLancamentos(), fetchQuestoes(), fetchSkipCounts()]);
+    setDisciplines(d); setTopics(t); setLancamentos(l); setQuestoes(q); setSkipCounts(s); setLoading(false);
+  }, []);
   useEffect(() => { load(); }, [load]);
-  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
-  const rows = disciplines.map((d) => { const dT = topics.filter((t) => t.disciplina_id === d.id); const dL = lancamentos.filter((l) => l.disciplina_id === d.id); const dQ = questoes.filter((q) => q.disciplina_id === d.id); const data = computeDisciplinaData(d, dT, dL, (skipCounts[d.id] ?? 0) > 0 ? 1.5 : 1); const acertos = dQ.filter((q) => q.acertou).length; return { discipline: d, dominio: data.dominioMedio, topicosNaoDominados: data.topicosNaoDominados, totalTopicos: dT.length, questoes: dQ.length, acertos, taxa: dQ.length > 0 ? (acertos / dQ.length) * 100 : 0, skips: skipCounts[d.id] ?? 0, tier: tierFromMastery(data.dominioMedio) }; });
+
+  const rows = disciplines.map((d) => {
+    const dT = topics.filter((t) => t.disciplina_id === d.id); const dL = lancamentos.filter((l) => l.disciplina_id === d.id); const dQ = questoes.filter((q) => q.disciplina_id === d.id);
+    const data = computeDisciplinaData(d, dT, dL, (skipCounts[d.id] ?? 0) > 0 ? 1.5 : 1); const acertos = dQ.filter((q) => q.acertou).length;
+    return { discipline: d, dominio: data.dominioMedio, topicosNaoDominados: data.topicosNaoDominados, totalTopicos: dT.length, questoes: dQ.length, acertos, taxa: dQ.length > 0 ? (acertos / dQ.length) * 100 : 0, skips: skipCounts[d.id] ?? 0, tier: tierFromMastery(data.dominioMedio) };
+  });
   const tc: Record<string, string> = { ruim: "text-error-600 bg-error-50 dark:text-error-400 dark:bg-error-900/30", medio: "text-warning-600 bg-warning-50 dark:text-warning-400 dark:bg-warning-900/30", bom: "text-success-600 bg-success-50 dark:text-success-400 dark:bg-success-900/30", otimo: "text-success-700 bg-success-100 dark:text-success-300 dark:bg-success-900/40" };
+
+  const totalAcertos = questoes.filter((q) => q.acertou).length;
+  const taxaGeral = questoes.length > 0 ? (totalAcertos / questoes.length) * 100 : 0;
+
+  const handleAnalise = async () => {
+    setAnaliseLoading(true); setAnaliseErro(null); setAnalise(null);
+    const dadosDisciplinas = rows.map((r) => ({ nome: r.discipline.nome, dominio: r.dominio, questoes: r.questoes, acertos: r.acertos, taxa: r.taxa }));
+    const { analise: a, error } = await aiAnaliseDesempenho({ disciplinas: dadosDisciplinas, taxaAcertosGeral: taxaGeral, horasEstudadas: (studyStats?.total ?? 0) / 3600, topicosEstudados: topics.length, diasConsecutivos: 0 });
+    if (error || !a) { setAnaliseErro(error ?? "Erro ao analisar"); setAnaliseLoading(false); return; }
+    setAnalise(a); setAnaliseLoading(false);
+  };
+
+  const handleRecomendacoes = async () => {
+    setRecomLoading(true); setRecomErro(null); setRecomendacoes(null);
+    const dadosDisc = rows.map((r) => ({ nome: r.discipline.nome, dominio: r.dominio, peso_edital: r.discipline.peso_edital, topicosNaoDominados: r.topicosNaoDominados }));
+    const { recomendacoes: recs, error } = await aiRecomendacoes({ disciplinas: dadosDisc, diasRestantes: 180 });
+    if (error || !recs) { setRecomErro(error ?? "Erro ao gerar recomendações"); setRecomLoading(false); return; }
+    setRecomendacoes(recs); setRecomLoading(false);
+  };
+
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
+
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100">Desempenho</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Acompanhe seu domínio, questões e pulos por disciplina.</p></div>
+      <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100">Desempenho</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Acompanhe seu domínio, questões e pulos por disciplina. Use a IA para análise e recomendações.</p></div>
+      <div className="flex flex-wrap gap-2">
+        <button onClick={handleAnalise} disabled={analiseLoading} className="btn-primary">{analiseLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Analisando...</> : <><Sparkles className="w-4 h-4" /> Análise com IA</>}</button>
+        <button onClick={handleRecomendacoes} disabled={recomLoading} className="btn-secondary">{recomLoading ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando...</> : <><TrendingUp className="w-4 h-4" /> Recomendações IA</>}</button>
+      </div>
+      {analise && (
+        <div className="card p-6 animate-slideUp">
+          <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Análise de Desempenho</h3>
+          <p className="text-sm text-ink-700 dark:text-ink-300 mb-4">{analise.resumo}</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div><h4 className="text-xs font-bold text-success-600 dark:text-success-400 mb-2 flex items-center gap-1"><Star className="w-3.5 h-3.5" /> Pontos Fortes</h4><ul className="space-y-1">{analise.pontosFortes.map((p, i) => <li key={i} className="text-xs text-ink-600 dark:text-ink-400 flex items-start gap-1"><CheckCircle className="w-3 h-3 mt-0.5 text-success-500 shrink-0" /> {p}</li>)}</ul></div>
+            <div><h4 className="text-xs font-bold text-error-600 dark:text-error-400 mb-2 flex items-center gap-1"><AlertCircle className="w-3.5 h-3.5" /> Pontos Fracos</h4><ul className="space-y-1">{analise.pontosFracos.map((p, i) => <li key={i} className="text-xs text-ink-600 dark:text-ink-400 flex items-start gap-1"><AlertCircle className="w-3 h-3 mt-0.5 text-error-500 shrink-0" /> {p}</li>)}</ul></div>
+          </div>
+          <div className="mt-4"><h4 className="text-xs font-bold text-brand-600 dark:text-brand-400 mb-2">Recomendações</h4><ul className="space-y-1">{analise.recomendacoes.map((r, i) => <li key={i} className="text-xs text-ink-600 dark:text-ink-400 flex items-start gap-1"><TrendingUp className="w-3 h-3 mt-0.5 text-brand-500 shrink-0" /> {r}</li>)}</ul></div>
+        </div>
+      )}
+      {analiseErro && <p className="text-xs text-error-600 dark:text-error-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {analiseErro}</p>}
+      {recomendacoes && (
+        <div className="card p-6 animate-slideUp">
+          <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Recomendações Personalizadas</h3>
+          <ul className="space-y-2">{recomendacoes.map((r, i) => <li key={i} className="text-sm text-ink-700 dark:text-ink-300 flex items-start gap-2"><span className="w-6 h-6 rounded-lg bg-brand-50 dark:bg-brand-900/30 text-brand-600 dark:text-brand-400 flex items-center justify-center text-xs font-bold shrink-0">{i + 1}</span> {r}</li>)}</ul>
+        </div>
+      )}
+      {recomErro && <p className="text-xs text-error-600 dark:text-error-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {recomErro}</p>}
       <div className="card overflow-x-auto">
         <table className="w-full text-sm">
           <thead><tr className="border-b border-ink-100 dark:border-ink-800"><th className="text-left font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Disciplina</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Domínio</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Tópicos</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Questões</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Acertos</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Pulos</th><th className="text-center font-semibold text-ink-600 dark:text-ink-400 px-4 py-3">Nível</th></tr></thead>

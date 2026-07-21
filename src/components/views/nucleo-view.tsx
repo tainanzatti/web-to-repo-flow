@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { Shield, SkipForward, Lock, BookOpen, CheckCircle, Clock, AlertCircle, FileText, Link as LinkIcon, Upload, Trash2, Sparkles, ExternalLink, File, Loader2 } from "lucide-react";
 import { fetchDisciplines, fetchAllTopics, fetchLancamentos, fetchSkipCounts, incrementSkipCount, insertLancamento, resetSkipCount, fetchLeiSeca, insertLeiSecaLink, uploadLeiSecaFile, deleteLeiSeca, fetchResumo, insertResumo, fetchLeiSecaContexto, type LeiSecaRow } from "../../lib/db";
 import { computeDisciplinaData, nextHeroDiscipline, maxTopicsForDiscipline, allocateTopics, tierFromMastery, dominioMedio, type Discipline, type Topic, type Lancamento } from "../../lib/curriculum";
-import { gerarResumo } from "../../lib/ai-client";
+import { aiResumo } from "../../lib/ai.service";
 
 export function NucleoView() {
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
@@ -112,7 +112,7 @@ function TopicCard({ topic, discipline }: { topic: Topic; discipline: Discipline
   const handleAddLink = async () => { if (!linkTitle.trim() || !linkUrl.trim()) return; setErro(null); await insertLeiSecaLink(topic.id, linkTitle.trim(), linkUrl.trim()); setLinkTitle(""); setLinkUrl(""); await loadLeiSeca(); };
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => { const file = e.target.files?.[0]; if (!file) return; setUploading(true); setErro(null); try { await uploadLeiSecaFile(topic.id, file); await loadLeiSeca(); } catch (err) { setErro((err as Error).message); } setUploading(false); e.target.value = ""; };
   const handleDelete = async (id: string) => { await deleteLeiSeca(id); await loadLeiSeca(); };
-  const handleGerarResumo = async () => { setGerando(true); setErro(null); const ctx = await fetchLeiSecaContexto(topic.id); const { resumo: txt, error } = await gerarResumo(topic.nome, discipline.nome, ctx); if (error || !txt) { setErro(error ?? "Erro ao gerar resumo"); setGerando(false); return; } await insertResumo(discipline.id, topic.id, txt); setResumo(txt); setGerando(false); };
+  const handleGerarResumo = async () => { setGerando(true); setErro(null); const ctx = await fetchLeiSecaContexto(topic.id); const { content: txt, error } = await aiResumo(topic.nome, discipline.nome, ctx); if (error || !txt) { setErro(error ?? "Erro ao gerar resumo"); setGerando(false); return; } await insertResumo(discipline.id, topic.id, txt); setResumo(txt); setGerando(false); };
 
   return (
     <div className="card p-4 animate-slideUp">

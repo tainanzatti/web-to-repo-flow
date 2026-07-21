@@ -118,6 +118,10 @@ export async function insertRedacao(tema: string, texto: string): Promise<void> 
   const { error } = await supabase.from("redacoes").insert({ tema, texto });
   if (error) throw error;
 }
+export async function updateRedacaoNota(id: string, nota: number): Promise<void> {
+  const { error } = await supabase.from("redacoes").update({ nota }).eq("id", id);
+  if (error) throw error;
+}
 export async function fetchPlanoHoje(): Promise<{ id: string; plano_json: unknown } | null> {
   const today = new Date().toISOString().slice(0, 10);
   const { data } = await supabase.from("planos_estudo").select("id, plano_json").eq("data", today).maybeSingle();
@@ -166,7 +170,6 @@ export async function resetAllProgress(): Promise<void> {
   }
 }
 
-// Ranking functions
 export interface RankingRow {
   user_id: string; nome: string; email: string; xp_total: number; patente: string; patente_level: number;
   questoes_respondidas: number; questoes_corretas: number; taxa_acertos: number; topicos_estudados: number;

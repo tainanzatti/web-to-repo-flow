@@ -1,11 +1,8 @@
 import { useEffect, useState, useCallback } from "react";
-import { Loader2, Plus, Trash2, HelpCircle, CheckCircle, XCircle, BookOpen } from "lucide-react";
-import {
-  fetchDisciplines, fetchAllTopics, fetchQuestoes, insertQuestao, deleteQuestao,
-  fetchQuestaoLancamentos, insertQuestaoLancamento, deleteQuestaoLancamento,
-  type QuestaoLancamentoRow,
-} from "../../lib/db";
+import { Loader2, Plus, Trash2, HelpCircle, CheckCircle, XCircle, BookOpen, Sparkles, AlertCircle, Award } from "lucide-react";
+import { fetchDisciplines, fetchAllTopics, fetchQuestoes, insertQuestao, deleteQuestao, fetchQuestaoLancamentos, insertQuestaoLancamento, deleteQuestaoLancamento, type QuestaoLancamentoRow } from "../../lib/db";
 import { type Discipline, type Topic, type QuestaoRow } from "../../lib/curriculum";
+import { aiGerarQuestoes, aiExplicarAlternativa, type QuestaoGerada } from "../../lib/ai.service";
 
 export function QuestoesView() {
   const [disciplines, setDisciplines] = useState<Discipline[]>([]);
@@ -26,6 +23,16 @@ export function QuestoesView() {
   const [batchAcertos, setBatchAcertos] = useState(0);
   const [batchFonte, setBatchFonte] = useState("");
   const [batchSaving, setBatchSaving] = useState(false);
+  const [showGerar, setShowGerar] = useState(false);
+  const [gerarDisc, setGerarDisc] = useState("");
+  const [gerarTopico, setGerarTopico] = useState("");
+  const [gerarQtd, setGerarQtd] = useState(5);
+  const [gerando, setGerando] = useState(false);
+  const [questoesGeradas, setQuestoesGeradas] = useState<QuestaoGerada[]>([]);
+  const [gerarErro, setGerarErro] = useState<string | null>(null);
+  const [explicando, setExplicando] = useState<number | null>(null);
+  const [explicacao, setExplicacao] = useState<string | null>(null);
+  const [explicacaoErro, setExplicacaoErro] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     const [d, t, q, l] = await Promise.all([fetchDisciplines(), fetchAllTopics(), fetchQuestoes(), fetchQuestaoLancamentos()]);
@@ -35,32 +42,47 @@ export function QuestoesView() {
 
   const filteredTopics = topics.filter((t) => t.disciplina_id === selDisc);
   const batchTopics = topics.filter((t) => t.disciplina_id === batchDisc);
+  const gerarTopics = topics.filter((t) => t.disciplina_id === gerarDisc);
 
   const handleSave = async () => {
-    if (!selDisc || !selTopico) return;
-    setSaving(true);
+    if (!selDisc || !selTopico) return; setSaving(true);
     await insertQuestao(selDisc, selTopico, acertou, fonte.trim() || null);
-    setSelTopico(""); setFonte(""); setAcertou(true); setShowForm(false); setSaving(false);
-    await load();
+    setSelTopico(""); setFonte(""); setAcertou(true); setShowForm(false); setSaving(false); await load();
   };
   const handleBatchSave = async () => {
-    if (!batchDisc || !batchTopico || batchQuantidade < 1) return;
-    setBatchSaving(true);
+    if (!batchDisc || !batchTopico || batchQuantidade < 1) return; setBatchSaving(true);
     await insertQuestaoLancamento(batchDisc, batchTopico, batchQuantidade, Math.min(batchAcertos, batchQuantidade), batchFonte.trim() || null);
-    setBatchDisc(""); setBatchTopico(""); setBatchQuantidade(10); setBatchAcertos(0); setBatchFonte(""); setShowBatchForm(false); setBatchSaving(false);
-    await load();
+    setBatchDisc(""); setBatchTopico(""); setBatchQuantidade(10); setBatchAcertos(0); setBatchFonte(""); setShowBatchForm(false); setBatchSaving(false); await load();
   };
   const handleDelete = async (id: string) => { await deleteQuestao(id); await load(); };
   const handleDeleteLanc = async (id: string) => { await deleteQuestaoLancamento(id); await load(); };
+
+  const handleGerar = async () => {
+    if (!gerarDisc || !gerarTopico) return; setGerando(true); setGerarErro(null); setQuestoesGeradas([]);
+    const disc = disciplines.find((d) => d.id === gerarDisc)?.nome ?? "";
+    const top = topics.find((t) => t.id === gerarTopico)?.nome ?? "";
+    const { questoes: qs, error } = await aiGerarQuestoes(disc, top, gerarQtd);
+    if (error) { setGerarErro(error); setGerando(false); return; }
+    setQuestoesGeradas(qs); setGerando(false);
+  };
+
+  const handleExplicar = async (q: QuestaoGerada, idx: number) => {
+    setExplicando(idx); setExplicacao(null); setExplicacaoErro(null);
+    const disc = disciplines.find((d) => d.id === gerarDisc)?.nome ?? "";
+    const { content, error } = await aiExplicarAlternativa(q.enunciado, q.correta, q.alternativas, disc);
+    if (error) { setExplicacaoErro(error); } else { setExplicacao(content); }
+    setExplicando(null);
+  };
 
   if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100">Questões</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Registre questões individuais ou em lote para acompanhar seu desempenho.</p></div>
+      <div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100">Questões</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">Registre questões, gere questões com IA no estilo AOCP e obtenha explicações.</p></div>
       <div className="flex flex-wrap gap-2">
-        <button onClick={() => { setShowForm(!showForm); setShowBatchForm(false); }} className="btn-primary"><Plus className="w-4 h-4" /> Questão individual</button>
-        <button onClick={() => { setShowBatchForm(!showBatchForm); setShowForm(false); }} className="btn-secondary"><BookOpen className="w-4 h-4" /> Lançamento em lote</button>
+        <button onClick={() => { setShowForm(!showForm); setShowBatchForm(false); setShowGerar(false); }} className="btn-primary"><Plus className="w-4 h-4" /> Questão individual</button>
+        <button onClick={() => { setShowBatchForm(!showBatchForm); setShowForm(false); setShowGerar(false); }} className="btn-secondary"><BookOpen className="w-4 h-4" /> Lançamento em lote</button>
+        <button onClick={() => { setShowGerar(!showGerar); setShowForm(false); setShowBatchForm(false); }} className="btn-secondary"><Sparkles className="w-4 h-4" /> Gerar com IA</button>
       </div>
       {showForm && (
         <div className="card p-6 space-y-4 animate-slideUp">
@@ -87,6 +109,36 @@ export function QuestoesView() {
           </div>
           <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Fonte (opcional)</label><input type="text" value={batchFonte} onChange={(e) => setBatchFonte(e.target.value)} placeholder="Ex: Simulado AOCP..." className="input-base border-ink-200 dark:border-ink-700" /></div>
           <div className="flex gap-2 justify-end"><button onClick={() => setShowBatchForm(false)} className="btn-secondary">Cancelar</button><button onClick={handleBatchSave} disabled={batchSaving || !batchDisc || !batchTopico} className="btn-primary">{batchSaving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle className="w-4 h-4" />} Salvar lote</button></div>
+        </div>
+      )}
+      {showGerar && (
+        <div className="card p-6 space-y-4 animate-slideUp">
+          <h3 className="text-sm font-bold text-ink-900 dark:text-ink-100 flex items-center gap-2"><Sparkles className="w-4 h-4 text-brand-600 dark:text-brand-400" /> Gerar questões com IA (estilo AOCP)</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Disciplina</label><select value={gerarDisc} onChange={(e) => { setGerarDisc(e.target.value); setGerarTopico(""); }} className="input-base border-ink-200 dark:border-ink-700"><option value="">Selecione...</option>{disciplines.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}</select></div>
+            <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Tópico</label><select value={gerarTopico} onChange={(e) => setGerarTopico(e.target.value)} className="input-base border-ink-200 dark:border-ink-700" disabled={!gerarDisc}><option value="">Selecione...</option>{gerarTopics.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}</select></div>
+            <div><label className="text-sm font-medium text-ink-700 dark:text-ink-300 mb-1 block">Quantidade</label><input type="number" min={1} max={10} value={gerarQtd} onChange={(e) => setGerarQtd(Math.min(10, Math.max(1, parseInt(e.target.value) || 1)))} className="input-base border-ink-200 dark:border-ink-700" /></div>
+          </div>
+          <button onClick={handleGerar} disabled={gerando || !gerarDisc || !gerarTopico} className="btn-primary">{gerando ? <><Loader2 className="w-4 h-4 animate-spin" /> Gerando...</> : <><Sparkles className="w-4 h-4" /> Gerar questões</>}</button>
+          {gerarErro && <p className="text-xs text-error-600 dark:text-error-400 flex items-center gap-1"><AlertCircle className="w-3 h-3" /> {gerarErro}</p>}
+          {questoesGeradas.length > 0 && (
+            <div className="space-y-4">
+              {questoesGeradas.map((q, i) => (
+                <div key={i} className="border border-ink-100 dark:border-ink-800 rounded-xl p-4">
+                  <p className="text-sm font-medium text-ink-800 dark:text-ink-200 mb-3">{i + 1}. {q.enunciado}</p>
+                  <div className="space-y-1.5 mb-3">
+                    {q.alternativas.map((a) => (
+                      <div key={a.letra} className={`text-sm px-3 py-2 rounded-lg ${a.letra === q.correta ? "bg-success-50 dark:bg-success-900/30 text-success-700 dark:text-success-300 font-medium" : "bg-ink-50 dark:bg-ink-800 text-ink-600 dark:text-ink-400"}`}><span className="font-semibold">{a.letra})</span> {a.texto}</div>
+                    ))}
+                  </div>
+                  <div className="text-xs text-ink-500 dark:text-ink-400 bg-brand-50/50 dark:bg-brand-900/10 rounded-lg p-3 mb-2"><span className="font-semibold">Resposta correta: {q.correta}</span> — {q.explicacao}</div>
+                  <button onClick={() => handleExplicar(q, i)} disabled={explicando === i} className="btn-ghost text-xs">{explicando === i ? <><Loader2 className="w-3 h-3 animate-spin" /> Explicando...</> : <><Award className="w-3 h-3" /> Explicar alternativas</>}</button>
+                  {explicando === null && explicacao && questoesGeradas[i] === q && <div className="text-xs text-ink-600 dark:text-ink-400 mt-2 p-3 rounded-lg bg-ink-50 dark:bg-ink-800 whitespace-pre-wrap">{explicacao}</div>}
+                  {explicacaoErro && <p className="text-xs text-error-600 dark:text-error-400 mt-1">{explicacaoErro}</p>}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
       <div className="card p-6">
