@@ -15,39 +15,27 @@ export function FlashcardsView() {
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const current = cards[index];
 
   const handleReview = async (acertou: boolean) => {
     if (!current) return;
-    const newBox = acertou
-      ? Math.min(current.box + 1, LEITNER_BOXES.length)
-      : 1;
+    const newBox = acertou ? Math.min(current.caixa + 1, LEITNER_BOXES.length) : 1;
     await updateFlashcardBox(current.id, newBox);
     setFlipped(false);
     setIndex((i) => (i + 1) % Math.max(cards.length, 1));
     await load();
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
   if (cards.length === 0) {
     return (
       <div className="text-center py-20">
         <Layers className="w-12 h-12 text-ink-300 mx-auto mb-4" />
         <h2 className="text-lg font-bold text-ink-900">Nenhum flashcard ainda</h2>
-        <p className="text-sm text-ink-500 mt-1">
-          Flashcards serão gerados automaticamente quando você estudar tópicos no Núcleo.
-        </p>
+        <p className="text-sm text-ink-500 mt-1">Flashcards serão gerados automaticamente quando você estudar tópicos no Núcleo.</p>
       </div>
     );
   }
@@ -56,11 +44,8 @@ export function FlashcardsView() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-ink-900">Flashcards</h1>
-        <p className="text-sm text-ink-500 mt-1">
-          Repetição espaçada (Leitner). Cartão {index + 1} de {cards.length}.
-        </p>
+        <p className="text-sm text-ink-500 mt-1">Repetição espaçada (Leitner). Cartão {index + 1} de {cards.length}.</p>
       </div>
-
       <div className="flex justify-center">
         <div
           onClick={() => setFlipped(!flipped)}
@@ -81,21 +66,15 @@ export function FlashcardsView() {
           )}
         </div>
       </div>
-
       {flipped && (
         <div className="flex justify-center gap-3 animate-fadeIn">
-          <button onClick={() => handleReview(false)} className="btn-danger">
-            <X className="w-4 h-4" /> Errei
-          </button>
-          <button onClick={() => handleReview(true)} className="btn-primary">
-            <Check className="w-4 h-4" /> Acertei
-          </button>
+          <button onClick={() => handleReview(false)} className="btn-danger"><X className="w-4 h-4" /> Errei</button>
+          <button onClick={() => handleReview(true)} className="btn-primary"><Check className="w-4 h-4" /> Acertei</button>
         </div>
       )}
-
       <div className="flex items-center justify-center gap-2 text-sm text-ink-500">
         <RotateCcw className="w-4 h-4" />
-        Caixa {current?.box ?? 1} de {LEITNER_BOXES.length} · próxima revisão em {LEITNER_BOXES[(current?.box ?? 1) - 1]} dias
+        Caixa {current?.caixa ?? 1} de {LEITNER_BOXES.length} · próxima revisão em {LEITNER_BOXES[(current?.caixa ?? 1) - 1]} dias
       </div>
     </div>
   );

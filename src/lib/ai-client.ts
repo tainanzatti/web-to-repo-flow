@@ -1,36 +1,39 @@
-const AI_GATEWAY_URL = import.meta.env.VITE_AI_GATEWAY_URL ?? "";
+import { supabase } from "./supabase";
 
-interface AIResponse {
-  data?: string;
-  error?: string;
-}
-
-export async function callAI(endpoint: string, body: unknown): Promise<AIResponse> {
+export async function gerarResumo(
+  topicoNome: string,
+  disciplinaNome: string,
+  leiSecaContexto?: string
+): Promise<{ resumo?: string; error?: string }> {
   try {
-    const url = AI_GATEWAY_URL ? `${AI_GATEWAY_URL}/${endpoint}` : `/api/${endpoint}`;
+    const { data: sessionData } = await supabase.auth.getSession();
+    const token = sessionData.session?.access_token;
+    if (!token) return { error: "Não autenticado" };
+
+    const url = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/gerar-resumo`;
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+        apikey: import.meta.env.VITE_SUPABASE_ANON_KEY as string,
+      },
+      body: JSON.stringify({
+        topico_nome: topicoNome,
+        disciplina_nome: disciplinaNome,
+        lei_seca_contexto: leiSecaContexto,
+      }),
     });
+
     if (!res.ok) {
-      return { error: `Erro ${res.status}` };
+      const errBody = await res.json().catch(() => ({}));
+      return { error: errBody.error ?? `Erro ${res.status}` };
     }
+
     const json = await res.json();
-    return { data: json.result ?? json.text ?? JSON.stringify(json) };
+    if (json.error) return { error: json.error };
+    return { resumo: json.resumo };
   } catch (err) {
     return { error: (err as Error).message };
   }
-}
-
-export async function generateFlashcardsAI(disciplina: string, topico: string): Promise<AIResponse> {
-  return callAI("flashcards", { disciplina, topico });
-}
-
-export async function generateRedacaoTemaAI(): Promise<AIResponse> {
-  return callAI("redacao-tema", {});
-}
-
-export async function corrigirRedacaoAI(tema: string, texto: string): Promise<AIResponse> {
-  return callAI("redacao-correcao", { tema, texto });
 }

@@ -1,10 +1,5 @@
 import { type ReactNode } from "react";
 
-interface CardProps {
-  children: ReactNode;
-  className?: string;
-}
-
-export function Card({ children, className = "" }: CardProps) {
+export function Card({ children, className = "" }: { children: ReactNode; className?: string }) {
   return <div className={`card ${className}`}>{children}</div>;
 }

@@ -7,7 +7,7 @@ interface AuthContextValue {
   user: User | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: string | null }>;
-  signUp: (email: string, password: string) => Promise<{ error: string | null; data: unknown }>;
+  signUp: (email: string, password: string) => Promise<{ error: string | null }>;
   signOut: () => Promise<void>;
 }
 
@@ -23,11 +23,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(false);
     });
 
-    supabase.auth.onAuthStateChange((_event, session) => {
-      (async () => {
-        setSession(session);
-      })();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, newSession) => {
+      setSession(newSession);
+      setLoading(false);
     });
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   const signIn = async (email: string, password: string) => {
@@ -36,8 +37,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signUp({ email, password });
-    return { error: error?.message ?? null, data };
+    const { error } = await supabase.auth.signUp({ email, password });
+    return { error: error?.message ?? null };
   };
 
   const signOut = async () => {
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 }
 
-export function useAuth(): AuthContextValue {
+export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;

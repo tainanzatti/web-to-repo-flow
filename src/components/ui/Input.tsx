@@ -31,7 +31,6 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
             className={`w-full rounded-xl border bg-white px-4 py-2.5 text-sm text-ink-800 transition-all focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent ${
               icon ? "pl-10" : ""
             } ${error ? "border-error-400" : "border-ink-200"} ${className}`}
-            aria-describedby={error ? `${inputId}-error` : undefined}
             {...props}
           />
         </div>

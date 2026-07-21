@@ -16,17 +16,9 @@ export function PerfilView() {
     setLoading(false);
   }, [user]);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
   return (
     <div className="space-y-6 max-w-2xl">
@@ -37,15 +29,9 @@ export function PerfilView() {
 
       <div className="card p-6">
         <div className="flex items-center gap-4 mb-6">
-          <div className="w-16 h-16 rounded-2xl bg-brand-600 flex items-center justify-center">
-            <User className="w-8 h-8 text-white" />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold text-ink-900">{profile?.nome ?? "—"}</h2>
-            <p className="text-sm text-ink-500">{user?.email}</p>
-          </div>
+          <div className="w-16 h-16 rounded-2xl bg-brand-600 flex items-center justify-center"><User className="w-8 h-8 text-white" /></div>
+          <div><h2 className="text-lg font-bold text-ink-900">{profile?.nome ?? "—"}</h2><p className="text-sm text-ink-500">{user?.email}</p></div>
         </div>
-
         <div className="space-y-4">
           <ProfileField icon={<Mail className="w-4 h-4" />} label="E-mail" value={profile?.email ?? user?.email ?? "—"} />
           <ProfileField icon={<Phone className="w-4 h-4" />} label="Telefone" value={profile?.telefone ? maskPhone(profile.telefone) : "—"} />
@@ -63,9 +49,7 @@ export function PerfilView() {
         </div>
       </div>
 
-      <button onClick={signOut} className="btn-danger">
-        <LogOut className="w-4 h-4" /> Sair da conta
-      </button>
+      <button onClick={signOut} className="btn-danger"><LogOut className="w-4 h-4" /> Sair da conta</button>
     </div>
   );
 }
@@ -73,13 +57,8 @@ export function PerfilView() {
 function ProfileField({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
   return (
     <div className="flex items-center gap-3 py-2 border-b border-ink-50 last:border-0">
-      <div className="w-8 h-8 rounded-lg bg-ink-100 flex items-center justify-center text-ink-500 shrink-0">
-        {icon}
-      </div>
-      <div className="flex-1">
-        <p className="text-xs text-ink-400">{label}</p>
-        <p className="text-sm text-ink-800">{value}</p>
-      </div>
+      <div className="w-8 h-8 rounded-lg bg-ink-100 flex items-center justify-center text-ink-500 shrink-0">{icon}</div>
+      <div className="flex-1"><p className="text-xs text-ink-400">{label}</p><p className="text-sm text-ink-800">{value}</p></div>
     </div>
   );
 }

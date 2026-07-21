@@ -15,31 +15,15 @@ export function PainelView() {
 
   const load = useCallback(async () => {
     const [d, t, l, q, s] = await Promise.all([
-      fetchDisciplines(),
-      fetchAllTopics(),
-      fetchLancamentos(),
-      fetchQuestoes(),
-      fetchSkipCounts(),
+      fetchDisciplines(), fetchAllTopics(), fetchLancamentos(), fetchQuestoes(), fetchSkipCounts(),
     ]);
-    setDisciplines(d);
-    setTopics(t);
-    setLancamentos(l);
-    setQuestoes(q);
-    setSkipCounts(s);
+    setDisciplines(d); setTopics(t); setLancamentos(l); setQuestoes(q); setSkipCounts(s);
     setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
   const totalLanc = lancamentos.length;
   const totalQuestoes = questoes.length;
@@ -57,8 +41,7 @@ export function PainelView() {
   const topicosNaoDominados = allData.reduce((a, b) => a + b.topicosNaoDominados, 0);
   const totalTopicos = topics.length;
 
-  // Projection: pace = lancamentos per day
-  const diasEstudados = new Set(lancamentos.map((l) => l.created_at.slice(0, 10))).size;
+  const diasEstudados = new Set(lancamentos.map((l) => l.criado_em.slice(0, 10))).size;
   const pace = diasEstudados > 0 ? totalLanc / diasEstudados : 1;
   const diasParaCobrir = pace > 0 ? Math.ceil(topicosNaoDominados / pace) : 0;
 
@@ -77,21 +60,11 @@ export function PainelView() {
       </div>
 
       <div className="card p-6">
-        <h3 className="text-sm font-bold text-ink-900 mb-4 flex items-center gap-2">
-          <Calculator className="w-4 h-4" /> Projeção de cobertura
-        </h3>
+        <h3 className="text-sm font-bold text-ink-900 mb-4 flex items-center gap-2"><Calculator className="w-4 h-4" /> Projeção de cobertura</h3>
         <div className="space-y-4">
           <div>
             <label className="text-sm text-ink-600 mb-1 block">Meta de dias até a prova: {metaDias}</label>
-            <input
-              type="range"
-              min={30}
-              max={365}
-              step={10}
-              value={metaDias}
-              onChange={(e) => setMetaDias(Number(e.target.value))}
-              className="w-full accent-brand-600"
-            />
+            <input type="range" min={30} max={365} step={10} value={metaDias} onChange={(e) => setMetaDias(Number(e.target.value))} className="w-full accent-brand-600" />
           </div>
           <div className="grid grid-cols-2 gap-4 text-sm">
             <div className="rounded-xl bg-ink-50 p-4">
@@ -104,9 +77,7 @@ export function PainelView() {
             </div>
           </div>
           {diasParaCobrir > metaDias && (
-            <p className="text-sm text-warning-600">
-              No ritmo atual, você ultrapassará a meta. Considere aumentar o ritmo de estudo.
-            </p>
+            <p className="text-sm text-warning-600">No ritmo atual, você ultrapassará a meta. Considere aumentar o ritmo de estudo.</p>
           )}
         </div>
       </div>
@@ -114,17 +85,15 @@ export function PainelView() {
       <div className="card p-6">
         <h3 className="text-sm font-bold text-ink-900 mb-4">Progresso por disciplina</h3>
         <div className="space-y-3">
-          {allData
-            .sort((a, b) => b.score - a.score)
-            .map(({ discipline, dominioMedio: dom }) => (
-              <div key={discipline.id} className="flex items-center gap-3">
-                <span className="text-sm text-ink-700 w-40 truncate">{discipline.nome}</span>
-                <div className="flex-1 h-2 bg-ink-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${dom}%` }} />
-                </div>
-                <span className="text-xs text-ink-500 w-10 text-right">{Math.round(dom)}%</span>
+          {allData.sort((a, b) => b.score - a.score).map(({ discipline, dominioMedio: dom }) => (
+            <div key={discipline.id} className="flex items-center gap-3">
+              <span className="text-sm text-ink-700 w-40 truncate">{discipline.nome}</span>
+              <div className="flex-1 h-2 bg-ink-100 rounded-full overflow-hidden">
+                <div className="h-full bg-brand-500 rounded-full transition-all" style={{ width: `${dom}%` }} />
               </div>
-            ))}
+              <span className="text-xs text-ink-500 w-10 text-right">{Math.round(dom)}%</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
@@ -133,16 +102,12 @@ export function PainelView() {
 
 function StatCard({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: string; color: string }) {
   const colorMap: Record<string, string> = {
-    brand: "bg-brand-50 text-brand-600",
-    success: "bg-success-50 text-success-600",
-    warning: "bg-warning-50 text-warning-600",
-    ink: "bg-ink-100 text-ink-600",
+    brand: "bg-brand-50 text-brand-600", success: "bg-success-50 text-success-600",
+    warning: "bg-warning-50 text-warning-600", ink: "bg-ink-100 text-ink-600",
   };
   return (
     <div className="card p-4">
-      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colorMap[color]}`}>
-        {icon}
-      </div>
+      <div className={`w-10 h-10 rounded-xl flex items-center justify-center mb-3 ${colorMap[color]}`}>{icon}</div>
       <p className="text-2xl font-bold text-ink-900">{value}</p>
       <p className="text-xs text-ink-500 mt-0.5">{label}</p>
     </div>

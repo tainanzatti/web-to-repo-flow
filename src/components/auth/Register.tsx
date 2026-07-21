@@ -1,145 +1,83 @@
 import { useState, type FormEvent } from "react";
-import { useNavigate, Link } from "react-router-dom";
-import { Mail, User, Phone, Calendar, CreditCard, AlertCircle, CheckCircle } from "lucide-react";
-import { AuthLayout } from "./AuthLayout";
+import { Link, useNavigate } from "react-router-dom";
+import { Mail, User, Phone, Calendar, CreditCard } from "lucide-react";
+import { AuthLayout } from "../ui/AuthLayout";
 import { Input } from "../ui/Input";
 import { PasswordInput } from "../ui/PasswordInput";
 import { Button } from "../ui/Button";
 import { ErrorMessage } from "../ui/FormField";
 import { useAuth } from "../../lib/auth-context";
-import { supabase } from "../../lib/supabase";
 import {
-  isValidEmail,
-  isValidCPF,
-  isValidPassword,
-  getPasswordStrength,
-  maskPhone,
-  maskCPF,
-  isValidBirthDate,
-  sanitize,
-  type PasswordStrength,
+  maskCPF, maskPhone, validateCPF, validateEmail, validatePhone,
+  validatePassword, validateBirthDate, passwordStrength,
 } from "../../lib/validations";
-
-interface FormErrors {
-  nome?: string;
-  email?: string;
-  telefone?: string;
-  dataNascimento?: string;
-  cpf?: string;
-  senha?: string;
-  confirmarSenha?: string;
-  form?: string;
-}
-
-const STRENGTH_CONFIG: Record<PasswordStrength, { label: string; color: string; bar: string }> = {
-  fraca: { label: "Fraca", color: "text-error-600", bar: "bg-error-500 w-1/3" },
-  media: { label: "Média", color: "text-warning-600", bar: "bg-warning-500 w-2/3" },
-  forte: { label: "Forte", color: "text-success-600", bar: "bg-success-500 w-full" },
-};
+import { supabase } from "../../lib/supabase";
 
 export function Register() {
-  const navigate = useNavigate();
   const { signUp } = useAuth();
+  const navigate = useNavigate();
   const [nome, setNome] = useState("");
   const [email, setEmail] = useState("");
-  const [telefone, setTelefone] = useState("");
-  const [dataNascimento, setDataNascimento] = useState("");
+  const [password, setPassword] = useState("");
   const [cpf, setCpf] = useState("");
-  const [senha, setSenha] = useState("");
-  const [confirmarSenha, setConfirmarSenha] = useState("");
-  const [errors, setErrors] = useState<FormErrors>({});
+  const [phone, setPhone] = useState("");
+  const [birthDate, setBirthDate] = useState("");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const strength = senha ? getPasswordStrength(senha) : null;
+  const strength = passwordStrength(password);
 
-  const validate = (): boolean => {
-    const e: FormErrors = {};
-
-    if (!nome.trim()) e.nome = "Nome é obrigatório";
-    else if (nome.trim().length < 3) e.nome = "Nome deve ter no mínimo 3 caracteres";
-
-    if (!email) e.email = "E-mail é obrigatório";
-    else if (!isValidEmail(email)) e.email = "E-mail inválido";
-
-    if (!telefone) e.telefone = "Telefone é obrigatório";
-    else if (telefone.replace(/\D/g, "").length < 10) e.telefone = "Telefone incompleto";
-
-    const birthCheck = isValidBirthDate(dataNascimento);
-    if (!birthCheck.valid) e.dataNascimento = birthCheck.error;
-
-    if (!cpf) e.cpf = "CPF é obrigatório";
-    else if (!isValidCPF(cpf)) e.cpf = "CPF inválido";
-
-    if (!senha) e.senha = "Senha é obrigatória";
-    else if (!isValidPassword(senha))
-      e.senha = "Senha deve ter no mínimo 8 caracteres, com maiúscula, minúscula, número e caractere especial";
-
-    if (!confirmarSenha) e.confirmarSenha = "Confirme sua senha";
-    else if (confirmarSenha !== senha) e.confirmarSenha = "As senhas não coincidem";
-
-    setErrors(e);
-    return Object.keys(e).length === 0;
-  };
-
-  const handleSubmit = async (ev: FormEvent) => {
-    ev.preventDefault();
-    if (!validate()) return;
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    const newErrors: Record<string, string> = {};
+    if (!nome.trim()) newErrors.nome = "Nome é obrigatório";
+    if (!validateEmail(email)) newErrors.email = "E-mail inválido";
+    const pwCheck = validatePassword(password);
+    if (!pwCheck.valid) newErrors.password = pwCheck.message!;
+    if (!validateCPF(cpf)) newErrors.cpf = "CPF inválido";
+    if (!validatePhone(phone)) newErrors.phone = "Telefone inválido";
+    if (!birthDate) newErrors.birthDate = "Data de nascimento é obrigatória";
+    else if (!validateBirthDate(birthDate)) newErrors.birthDate = "Você deve ter pelo menos 16 anos";
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
+      return;
+    }
     setLoading(true);
-    setErrors({});
-
-    const cleanEmail = sanitize(email);
-    const { error } = await signUp(cleanEmail, senha);
-
+    const { error } = await signUp(email, password);
     if (error) {
       setErrors({ form: error });
       setLoading(false);
       return;
     }
-
-    // Insert profile data
-    const { data: userData } = await supabase.auth.getUser();
-    const userId = userData.user?.id;
+    // Create profile
+    const { data: sessionData } = await supabase.auth.getSession();
+    const userId = sessionData.session?.user?.id;
     if (userId) {
-      const { error: profileError } = await supabase.from("profiles").insert({
+      await supabase.from("profiles").insert({
         id: userId,
-        nome: sanitize(nome),
-        email: cleanEmail,
-        telefone: telefone,
-        data_nascimento: dataNascimento || null,
-        cpf: cpf,
+        nome,
+        email,
+        cpf: cpf.replace(/\D/g, ""),
+        telefone: phone.replace(/\D/g, ""),
+        data_nascimento: birthDate,
       });
-
-      if (profileError) {
-        console.error("Erro ao salvar perfil:", profileError.message);
-      }
     }
-
-    setSuccess(true);
     setLoading(false);
-    setTimeout(() => navigate("/painel"), 1200);
+    navigate("/painel");
   };
 
   return (
-    <AuthLayout title="Cadastro" subtitle="Crie sua conta e comece a estudar para o concurso Soldado PMSC 2026">
-      {success && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl bg-success-50 px-4 py-3 text-sm text-success-700 animate-fadeIn">
-          <CheckCircle className="w-4 h-4 shrink-0" /> Cadastro realizado com sucesso!
-        </div>
-      )}
-
-      {errors.form && (
-        <div className="mb-4 flex items-center gap-2 rounded-xl bg-error-50 px-4 py-3 text-sm text-error-700 animate-fadeIn">
-          <AlertCircle className="w-4 h-4 shrink-0" /> {errors.form}
-        </div>
-      )}
-
-      <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+    <AuthLayout title="Criar conta" subtitle="Cadastre-se para começar a estudar para o Soldado PMSC 2026">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        {errors.form && (
+          <div className="rounded-xl bg-error-50 px-4 py-3 text-sm text-error-700 animate-fadeIn">
+            {errors.form}
+          </div>
+        )}
         <div>
           <Input
             label="Nome completo"
-            type="text"
-            placeholder="João da Silva"
+            placeholder="Seu nome"
             icon={<User className="w-4 h-4" />}
             value={nome}
             onChange={(e) => setNome(e.target.value)}
@@ -148,7 +86,6 @@ export function Register() {
           />
           <ErrorMessage message={errors.nome} />
         </div>
-
         <div>
           <Input
             label="E-mail"
@@ -162,91 +99,75 @@ export function Register() {
           />
           <ErrorMessage message={errors.email} />
         </div>
-
         <div>
-          <Input
-            label="Telefone"
-            type="tel"
-            placeholder="(99) 99999-9999"
-            icon={<Phone className="w-4 h-4" />}
-            value={telefone}
-            onChange={(e) => setTelefone(maskPhone(e.target.value))}
-            error={errors.telefone}
-            autoComplete="tel"
+          <PasswordInput
+            label="Senha"
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            error={errors.password}
+            autoComplete="new-password"
           />
-          <ErrorMessage message={errors.telefone} />
+          <ErrorMessage message={errors.password} />
+          {password && (
+            <div className="mt-2">
+              <div className="flex gap-1">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className={`h-1 flex-1 rounded-full transition-colors ${i < strength.score ? strength.color : "bg-ink-100"}`}
+                  />
+                ))}
+              </div>
+              <p className="text-xs text-ink-400 mt-1">{strength.label}</p>
+            </div>
+          )}
         </div>
-
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <Input
+              label="CPF"
+              placeholder="000.000.000-00"
+              icon={<CreditCard className="w-4 h-4" />}
+              value={cpf}
+              onChange={(e) => setCpf(maskCPF(e.target.value))}
+              error={errors.cpf}
+              maxLength={14}
+            />
+            <ErrorMessage message={errors.cpf} />
+          </div>
+          <div>
+            <Input
+              label="Telefone"
+              placeholder="(48) 99999-9999"
+              icon={<Phone className="w-4 h-4" />}
+              value={phone}
+              onChange={(e) => setPhone(maskPhone(e.target.value))}
+              error={errors.phone}
+              maxLength={15}
+            />
+            <ErrorMessage message={errors.phone} />
+          </div>
+        </div>
         <div>
           <Input
             label="Data de nascimento"
             type="date"
             icon={<Calendar className="w-4 h-4" />}
-            value={dataNascimento}
-            onChange={(e) => setDataNascimento(e.target.value)}
-            error={errors.dataNascimento}
-            max={new Date().toISOString().slice(0, 10)}
+            value={birthDate}
+            onChange={(e) => setBirthDate(e.target.value)}
+            error={errors.birthDate}
           />
-          <ErrorMessage message={errors.dataNascimento} />
+          <ErrorMessage message={errors.birthDate} />
         </div>
-
-        <div>
-          <Input
-            label="CPF"
-            type="text"
-            placeholder="999.999.999-99"
-            icon={<CreditCard className="w-4 h-4" />}
-            value={cpf}
-            onChange={(e) => setCpf(maskCPF(e.target.value))}
-            error={errors.cpf}
-            inputMode="numeric"
-          />
-          <ErrorMessage message={errors.cpf} />
-        </div>
-
-        <div>
-          <PasswordInput
-            label="Senha"
-            placeholder="••••••••"
-            value={senha}
-            onChange={(e) => setSenha(e.target.value)}
-            error={errors.senha}
-            autoComplete="new-password"
-          />
-          <ErrorMessage message={errors.senha} />
-          {strength && (
-            <div className="mt-2">
-              <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden">
-                <div className={`h-full rounded-full transition-all duration-300 ${STRENGTH_CONFIG[strength].bar}`} />
-              </div>
-              <p className={`text-xs mt-1 font-medium ${STRENGTH_CONFIG[strength].color}`}>
-                Força da senha: {STRENGTH_CONFIG[strength].label}
-              </p>
-            </div>
-          )}
-        </div>
-
-        <div>
-          <PasswordInput
-            label="Confirmar senha"
-            placeholder="••••••••"
-            value={confirmarSenha}
-            onChange={(e) => setConfirmarSenha(e.target.value)}
-            error={errors.confirmarSenha}
-            autoComplete="new-password"
-          />
-          <ErrorMessage message={errors.confirmarSenha} />
-        </div>
-
-        <Button type="submit" loading={loading} className="w-full">
-          Cadastrar
+        <Button type="submit" loading={loading} className="w-full btn-primary">
+          Criar conta
         </Button>
       </form>
-
       <div className="mt-6 text-center text-sm text-ink-500">
         Já tem uma conta?{" "}
         <Link to="/login" className="text-brand-600 hover:text-brand-700 font-semibold transition-colors">
-          Faça login
+          Entrar
         </Link>
       </div>
     </AuthLayout>

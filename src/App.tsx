@@ -33,25 +33,22 @@ export default function App() {
     <Routes>
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/cadastro" element={<PublicRoute><Register /></PublicRoute>} />
-      <Route
-        path="/*"
-        element={
-          <ProtectedRoute>
-            <AppLayout>
-              <Routes>
-                <Route path="/" element={<Navigate to="/painel" replace />} />
-                <Route path="/painel" element={<PainelView />} />
-                <Route path="/nucleo" element={<NucleoView />} />
-                <Route path="/flashcards" element={<FlashcardsView />} />
-                <Route path="/questoes" element={<QuestoesView />} />
-                <Route path="/redacao" element={<RedacaoView />} />
-                <Route path="/desempenho" element={<DesempenhoView />} />
-                <Route path="/perfil" element={<PerfilView />} />
-              </Routes>
-            </AppLayout>
-          </ProtectedRoute>
-        }
-      />
+      <Route path="/*" element={
+        <ProtectedRoute>
+          <AppLayout>
+            <Routes>
+              <Route path="/" element={<Navigate to="/painel" replace />} />
+              <Route path="/painel" element={<PainelView />} />
+              <Route path="/nucleo" element={<NucleoView />} />
+              <Route path="/flashcards" element={<FlashcardsView />} />
+              <Route path="/questoes" element={<QuestoesView />} />
+              <Route path="/redacao" element={<RedacaoView />} />
+              <Route path="/desempenho" element={<DesempenhoView />} />
+              <Route path="/perfil" element={<PerfilView />} />
+            </Routes>
+          </AppLayout>
+        </ProtectedRoute>
+      } />
     </Routes>
   );
 }

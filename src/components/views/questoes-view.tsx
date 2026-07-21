@@ -11,20 +11,15 @@ export function QuestoesView() {
   const [selDisc, setSelDisc] = useState("");
   const [selTopic, setSelTopic] = useState("");
   const [acertou, setAcertou] = useState(true);
-  const [banca, setBanca] = useState("AOCP");
+  const [fonte, setFonte] = useState("AOCP");
   const [submitting, setSubmitting] = useState(false);
 
   const load = useCallback(async () => {
     const [d, t, q] = await Promise.all([fetchDisciplines(), fetchAllTopics(), fetchQuestoes()]);
-    setDisciplines(d);
-    setTopics(t);
-    setQuestoes(q);
-    setLoading(false);
+    setDisciplines(d); setTopics(t); setQuestoes(q); setLoading(false);
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useEffect(() => { load(); }, [load]);
 
   const filteredTopics = selDisc ? topics.filter((t) => t.disciplina_id === selDisc) : [];
 
@@ -32,10 +27,8 @@ export function QuestoesView() {
     e.preventDefault();
     if (!selDisc) return;
     setSubmitting(true);
-    await insertQuestao(selDisc, selTopic || null, acertou, banca);
-    setSelTopic("");
-    setSubmitting(false);
-    await load();
+    await insertQuestao(selDisc, selTopic || null, acertou, fonte);
+    setSelTopic(""); setSubmitting(false); await load();
   };
 
   const byDiscipline = disciplines.map((d) => {
@@ -44,13 +37,7 @@ export function QuestoesView() {
     return { disc: d, total: dQ.length, acertos, taxa: dQ.length > 0 ? (acertos / dQ.length) * 100 : 0 };
   });
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-brand-600" />
-      </div>
-    );
-  }
+  if (loading) return <div className="flex items-center justify-center py-20"><Loader2 className="w-8 h-8 animate-spin text-brand-600" /></div>;
 
   return (
     <div className="space-y-6">
@@ -63,30 +50,16 @@ export function QuestoesView() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label className="text-sm font-medium text-ink-700 mb-1 block">Disciplina</label>
-            <select
-              value={selDisc}
-              onChange={(e) => { setSelDisc(e.target.value); setSelTopic(""); }}
-              className="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              required
-            >
+            <select value={selDisc} onChange={(e) => { setSelDisc(e.target.value); setSelTopic(""); }} className="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500" required>
               <option value="">Selecione...</option>
-              {disciplines.map((d) => (
-                <option key={d.id} value={d.id}>{d.nome}</option>
-              ))}
+              {disciplines.map((d) => <option key={d.id} value={d.id}>{d.nome}</option>)}
             </select>
           </div>
           <div>
             <label className="text-sm font-medium text-ink-700 mb-1 block">Tópico (opcional)</label>
-            <select
-              value={selTopic}
-              onChange={(e) => setSelTopic(e.target.value)}
-              className="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-              disabled={!selDisc}
-            >
+            <select value={selTopic} onChange={(e) => setSelTopic(e.target.value)} className="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500" disabled={!selDisc}>
               <option value="">Geral</option>
-              {filteredTopics.map((t) => (
-                <option key={t.id} value={t.id}>{t.nome}</option>
-              ))}
+              {filteredTopics.map((t) => <option key={t.id} value={t.id}>{t.nome}</option>)}
             </select>
           </div>
         </div>
@@ -94,28 +67,16 @@ export function QuestoesView() {
           <div>
             <label className="text-sm font-medium text-ink-700 mb-1 block">Resultado</label>
             <div className="flex gap-2">
-              <button type="button" onClick={() => setAcertou(true)} className={`btn ${acertou ? "btn-primary" : "btn-secondary"} flex-1`}>
-                <Check className="w-4 h-4" /> Acertei
-              </button>
-              <button type="button" onClick={() => setAcertou(false)} className={`btn ${!acertou ? "btn-danger" : "btn-secondary"} flex-1`}>
-                <X className="w-4 h-4" /> Errei
-              </button>
+              <button type="button" onClick={() => setAcertou(true)} className={`btn ${acertou ? "btn-primary" : "btn-secondary"} flex-1`}><Check className="w-4 h-4" /> Acertei</button>
+              <button type="button" onClick={() => setAcertou(false)} className={`btn ${!acertou ? "btn-danger" : "btn-secondary"} flex-1`}><X className="w-4 h-4" /> Errei</button>
             </div>
           </div>
           <div>
             <label className="text-sm font-medium text-ink-700 mb-1 block">Banca</label>
-            <input
-              type="text"
-              value={banca}
-              onChange={(e) => setBanca(e.target.value)}
-              className="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500"
-            />
+            <input type="text" value={fonte} onChange={(e) => setFonte(e.target.value)} className="w-full rounded-xl border border-ink-200 px-3 py-2.5 text-sm text-ink-900 focus:outline-none focus:ring-2 focus:ring-brand-500" />
           </div>
           <div className="flex items-end">
-            <button type="submit" disabled={submitting || !selDisc} className="btn-primary w-full">
-              {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileQuestion className="w-4 h-4" />}
-              Registrar
-            </button>
+            <button type="submit" disabled={submitting || !selDisc} className="btn-primary w-full">{submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileQuestion className="w-4 h-4" />} Registrar</button>
           </div>
         </div>
       </form>
@@ -124,13 +85,8 @@ export function QuestoesView() {
         {byDiscipline.map(({ disc, total, acertos, taxa }) => (
           <div key={disc.id} className="card p-4">
             <p className="text-sm font-semibold text-ink-900 mb-2">{disc.nome}</p>
-            <div className="flex items-center justify-between text-xs text-ink-500">
-              <span>{acertos}/{total} acertos</span>
-              <span>{taxa.toFixed(0)}%</span>
-            </div>
-            <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden mt-2">
-              <div className="h-full bg-brand-500 rounded-full" style={{ width: `${taxa}%` }} />
-            </div>
+            <div className="flex items-center justify-between text-xs text-ink-500"><span>{acertos}/{total} acertos</span><span>{taxa.toFixed(0)}%</span></div>
+            <div className="h-1.5 bg-ink-100 rounded-full overflow-hidden mt-2"><div className="h-full bg-brand-500 rounded-full" style={{ width: `${taxa}%` }} /></div>
           </div>
         ))}
       </div>
@@ -144,7 +100,7 @@ export function QuestoesView() {
               <div key={q.id} className="flex items-center gap-3 text-sm py-1.5 border-b border-ink-50 last:border-0">
                 {q.acertou ? <Check className="w-4 h-4 text-success-600" /> : <X className="w-4 h-4 text-error-600" />}
                 <span className="flex-1 text-ink-700">{disc?.nome ?? "—"}</span>
-                <span className="text-xs text-ink-400">{new Date(q.created_at).toLocaleDateString("pt-BR")}</span>
+                <span className="text-xs text-ink-400">{new Date(q.criado_em).toLocaleDateString("pt-BR")}</span>
               </div>
             );
           })}
