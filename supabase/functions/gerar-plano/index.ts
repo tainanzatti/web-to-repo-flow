@@ -29,7 +29,12 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    const topicosStr = topicos.map((t: any, i: number) => `${i + 1}. ${t.disciplina_nome} - ${t.topico_nome} | Domínio: ${t.mastery.toFixed(0)}% | Revisões: ${t.revisoes} | Dias desde última: ${t.dias_desde_ultima} | Questões: ${t.questoes} | Acertos: ${t.taxa_acertos.toFixed(0)}% | Erros: ${t.taxa_erros.toFixed(0)}% | Peso edital: ${t.peso_edital}`).join("\n");
+    const topicosStr = topicos.map((t: Record<string, unknown>, i: number) => {
+      const mn = t.mastery as number; const rv = t.revisoes as number; const dlu = t.dias_desde_ultima as number;
+      const qs = t.questoes as number; const ac = t.acertos as number; const ta = t.taxa_acertos as number;
+      const te = t.taxa_erros as number; const pe = t.peso_edital as number;
+      return `${i + 1}. ${t.disciplina_nome} - ${t.topico_nome} | Domínio: ${mn.toFixed(0)}% | Revisões: ${rv} | Dias desde última: ${dlu} | Questões: ${qs} | Acertos: ${ta.toFixed(0)}% | Erros: ${te.toFixed(0)}% | Peso edital: ${pe}`;
+    }).join("\n");
 
     const prompt = `Você é um especialista em concursos públicos para a Polícia Militar de Santa Catarina (PMSC). Com base nos dados de estudo do candidato abaixo, crie um plano de estudos para hoje com no máximo 60 minutos.
 
@@ -75,14 +80,15 @@ Retorne APENAS um JSON válido no formato:
       });
     }
 
-    let plano;
+    let plano: Record<string, unknown>;
     try { plano = JSON.parse(raw); }
     catch {
       const m = raw.match(/\{[\s\S]*\}/);
-      if (m) { try { plano = JSON.parse(m[0]); } catch {} }
+      if (m) { try { plano = JSON.parse(m[0]); } catch { plano = { error: "parse failed" }; } }
+      else { plano = { error: "parse failed" }; }
     }
 
-    if (!plano || !plano.itens) {
+    if (!plano.itens) {
       return new Response(JSON.stringify({ error: "Resposta da IA em formato inválido" }), {
         status: 502,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -94,7 +100,7 @@ Retorne APENAS um JSON válido no formato:
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

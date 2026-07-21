@@ -16,14 +16,12 @@ export interface DisciplinaData {
   dominioMedio: number; topicosNaoDominados: number;
   fatorEsquecimento: number; multiplicadorUrgencia: number; score: number;
 }
-
 export interface TopicoStats {
   topic: Topic; discipline: Discipline;
   masteryMedio: number; revisoes: number; diasDesdeUltimaRevisao: number;
   questoesRespondidas: number; acertos: number; taxaAcertos: number;
   erros: number; taxaErros: number; score: number;
 }
-
 export interface PlanoItem { topico_id: string; topico_nome: string; disciplina_nome: string; tempo_minutos: number; prioridade: Prioridade; motivo: string; }
 export interface PlanoEstudo { data: string; itens: PlanoItem[]; tempo_total: number; }
 
