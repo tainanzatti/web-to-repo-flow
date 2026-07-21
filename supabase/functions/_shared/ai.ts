@@ -1,4 +1,4 @@
-// Shared AI helper for all edge functions — uses Google Gemini (no client API key needed)
+// Shared AI helper for all edge functions — uses Google Gemini
 
 const GEMINI_MODEL = 'gemini-2.0-flash'
 
