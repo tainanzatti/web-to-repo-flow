@@ -366,7 +366,7 @@ function forgettingFactor(days: number | null): number {
 export function nextHeroDiscipline(lancamentos: Lancamento[]): string {
   if (lancamentos.length === 0) return ROTATION_ORDER[0]
 
-  let best = ROTATION_ORDER[0]
+  let best: string = ROTATION_ORDER[0]
   let bestScore = -Infinity
   for (const discId of ROTATION_ORDER) {
     const peso = editalWeight(discId)
