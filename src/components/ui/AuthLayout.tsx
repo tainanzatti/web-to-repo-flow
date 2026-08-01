@@ -1,4 +1,0 @@
-import { type ReactNode } from "react";
-export function AuthLayout({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
-  return <div className="min-h-screen flex items-center justify-center bg-ink-50 dark:bg-ink-950 px-4"><div className="w-full max-w-md"><div className="text-center mb-8"><div className="w-16 h-16 rounded-2xl bg-brand-600 flex items-center justify-center mx-auto mb-4"><svg className="w-8 h-8 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L4 6v6c0 5.5 3.8 10.7 8 12 4.2-1.3 8-6.5 8-12V6l-8-4z" /></svg></div><h1 className="text-2xl font-bold text-ink-900 dark:text-ink-100">{title}</h1><p className="text-sm text-ink-500 dark:text-ink-400 mt-1">{subtitle}</p></div><div className="card p-6">{children}</div></div></div>;
-}
