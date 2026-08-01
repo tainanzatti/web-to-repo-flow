@@ -359,22 +359,92 @@ function forgettingFactor(days: number | null): number {
   return Math.min(2.5, 1 + days / 5)
 }
 
-// Fila de prioridade ponderada: score = pesoEdital × (1 − domínio/100) × fatorEsquecimento.
+// Estado de "pulos" por disciplina (persistido em discipline_skips).
+export type SkipState = { skipCount: number; consecutiveSkips: number }
+export type DisciplineSkips = Record<string, SkipState>
+
+// Multiplicador de urgência escalonado: 1 pulo = ×1.5, 2 = ×2.0, 3 = ×2.5 (teto ×3).
+export function skipMultiplier(consecutiveSkips: number): number {
+  if (!consecutiveSkips || consecutiveSkips <= 0) return 1
+  return Math.min(3, 1 + consecutiveSkips * 0.5)
+}
+
+export type DisciplineScore = {
+  discId: string
+  peso: number
+  questoes: number | 'P2'
+  dominio: number | null
+  dias: number | null
+  esquecimento: number
+  skipMult: number
+  consecutiveSkips: number
+  score: number
+}
+
+export function disciplineScore(
+  lancamentos: Lancamento[],
+  discId: string,
+  skips: DisciplineSkips = {}
+): DisciplineScore {
+  const peso = editalWeight(discId)
+  const dominio = disciplineAverageMastery(lancamentos, discId)
+  const dominioNorm = dominio === null ? 0 : dominio / 100
+  const dias = daysSinceLastDisciplineReview(lancamentos, discId)
+  const esquecimento = forgettingFactor(dias)
+  const consecutiveSkips = skips[discId]?.consecutiveSkips ?? 0
+  const skipMult = skipMultiplier(consecutiveSkips)
+  return {
+    discId,
+    peso,
+    questoes: CURRICULUM[discId]?.questoes ?? 0,
+    dominio,
+    dias,
+    esquecimento,
+    skipMult,
+    consecutiveSkips,
+    score: peso * (1 - dominioNorm) * esquecimento * skipMult,
+  }
+}
+
+// Explicação em texto simples do motivo da prioridade.
+export function explainPriority(s: DisciplineScore): string {
+  const parts: string[] = []
+  parts.push(
+    typeof s.questoes === 'number' ? `peso ${s.questoes} no edital` : 'fase eliminatória (redação)'
+  )
+  parts.push(s.dominio === null ? 'sem domínio medido' : `domínio médio ${s.dominio}%`)
+  if (s.dias === null) parts.push('nunca revisada')
+  else if (s.dias === 0) parts.push('revisada hoje')
+  else parts.push(`sem revisão há ${s.dias} ${s.dias === 1 ? 'dia' : 'dias'}`)
+  if (s.consecutiveSkips > 0)
+    parts.push(`pulada ${s.consecutiveSkips}× seguidas (urgência ×${s.skipMult.toFixed(1)})`)
+  return parts.join(', ')
+}
+
+export function rankedDisciplines(
+  lancamentos: Lancamento[],
+  skips: DisciplineSkips = {}
+): DisciplineScore[] {
+  return ROTATION_ORDER.map((d) => disciplineScore(lancamentos, d, skips)).sort(
+    (a, b) => b.score - a.score
+  )
+}
+
+// Fila de prioridade ponderada: score = pesoEdital × (1 − domínio/100) × fatorEsquecimento × urgênciaDePulo.
 // A disciplina de maior score vira a próxima ativa. Garante que nenhuma disciplina fique
 // mais de um ciclo completo sem ser tocada: ao final de um ciclo completo (todas tocadas),
 // o esquecimento das primeiras já as impulsiona de novo.
-export function nextHeroDiscipline(lancamentos: Lancamento[]): string {
-  if (lancamentos.length === 0) return ROTATION_ORDER[0]
+export function nextHeroDiscipline(
+  lancamentos: Lancamento[],
+  skips: DisciplineSkips = {}
+): string {
+  const skipped = Object.values(skips).some((s) => s.consecutiveSkips > 0)
+  if (lancamentos.length === 0 && !skipped) return ROTATION_ORDER[0]
 
   let best: string = ROTATION_ORDER[0]
   let bestScore = -Infinity
   for (const discId of ROTATION_ORDER) {
-    const peso = editalWeight(discId)
-    const dominio = disciplineAverageMastery(lancamentos, discId)
-    const dominioNorm = dominio === null ? 0 : dominio / 100
-    const dias = daysSinceLastDisciplineReview(lancamentos, discId)
-    const esquecimento = forgettingFactor(dias)
-    const score = peso * (1 - dominioNorm) * esquecimento
+    const { score } = disciplineScore(lancamentos, discId, skips)
     if (score > bestScore) {
       bestScore = score
       best = discId
