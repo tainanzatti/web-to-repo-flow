@@ -316,9 +316,12 @@ export function MaterialModal({
         <div className="flex items-center gap-1.5 border-t border-border-soft bg-secondary px-5 py-2.5">
           <Sparkles size={11} className="text-faint" />
           <span className="text-[9px] leading-snug text-faint">
-            {activeTab === 'leiseca'
-              ? 'Anexe suas fontes favoritas (site da lei, PDFs, artigos) para consultar rápido.'
-              : 'Gerado por IA. Confira o texto oficial antes de memorizar trechos literais.'}
+            {isRedacao
+              ? 'Tema e correção gerados por IA. A nota (0–10) alimenta o domínio da disciplina Redação.'
+              : activeTab === 'leiseca'
+                ? 'Anexe suas fontes favoritas (site da lei, PDFs, artigos) para consultar rápido.'
+                : 'Gerado por IA. Confira o texto oficial antes de memorizar trechos literais.'}
+
           </span>
         </div>
       </div>
