@@ -158,30 +158,35 @@ export function MaterialModal({
           </button>
         </div>
 
-        <div className="flex gap-1 px-5 pt-3">
-          {TABS.map((mt) => {
-            const active = activeTab === mt.id
-            return (
-              <button
-                key={mt.id}
-                onClick={() => setActiveTab(mt.id)}
-                className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-300 ease-in-out active:scale-95 ${
-                  active
-                    ? 'border-primary/50 bg-card-raised text-primary'
-                    : 'border-transparent text-faint hover:text-muted-foreground'
-                }`}
-              >
-                {mt.label}
-              </button>
-            )
-          })}
-        </div>
+        {!isRedacao && (
+          <div className="flex gap-1 px-5 pt-3">
+            {TABS.map((mt) => {
+              const active = activeTab === mt.id
+              return (
+                <button
+                  key={mt.id}
+                  onClick={() => setActiveTab(mt.id)}
+                  className={`rounded-md border px-3 py-1.5 text-xs font-medium transition-all duration-300 ease-in-out active:scale-95 ${
+                    active
+                      ? 'border-primary/50 bg-card-raised text-primary'
+                      : 'border-transparent text-faint hover:text-muted-foreground'
+                  }`}
+                >
+                  {mt.label}
+                </button>
+              )
+            })}
+          </div>
+        )}
 
         <div
-          key={activeTab}
+          key={isRedacao ? 'redacao' : activeTab}
           className="flex-1 overflow-y-auto px-5 py-4 animate-in fade-in duration-300"
         >
-          {activeTab === 'leiseca' ? (
+          {isRedacao ? (
+            <RedacaoPanel onNota={onRedacaoNota} />
+          ) : activeTab === 'leiseca' ? (
+
             <div className="space-y-4">
               <div>
                 <label className="mb-1.5 flex items-center gap-1.5 font-mono text-[10px] font-semibold tracking-[0.15em] text-faint uppercase">
