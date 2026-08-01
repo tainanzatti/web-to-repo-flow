@@ -1,6 +1,8 @@
-import { generateStudyMaterial } from './ai.functions'
+import { generateStudyMaterial, corrigirRedacao, type CorrecaoResult } from './ai.functions'
 
-export type AIKind = 'leiseca' | 'resumo' | 'questoes' | 'briefing'
+export type AIKind = 'leiseca' | 'resumo' | 'questoes' | 'briefing' | 'redacao-tema'
+
+export type { CorrecaoResult, RedacaoFeedback } from './ai.functions'
 
 export async function generateAI(payload: {
   kind: AIKind
@@ -11,4 +13,10 @@ export async function generateAI(payload: {
   const result = await generateStudyMaterial({ data: payload })
   if ('error' in result) throw new Error(result.error)
   return result.text
+}
+
+export async function corrigirRedacaoAI(tema: string, texto: string): Promise<CorrecaoResult> {
+  const result = await corrigirRedacao({ data: { tema, texto } })
+  if ('error' in result) throw new Error(result.error)
+  return result
 }

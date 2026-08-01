@@ -366,8 +366,19 @@ function OperacaoPMSC() {
           discId={material.discId}
           topicId={material.topicId}
           onClose={() => setMaterial(null)}
+          onRedacaoNota={(nota) =>
+            addLancamento({
+              disciplinaId: 'redacao',
+              topicoId: material.topicId,
+              quantidade: 10,
+              acertos: Math.round(nota),
+              minutos: 60,
+              data: new Date().toISOString().slice(0, 10),
+            })
+          }
         />
       )}
+
       {concluir && (
         <ConcluirModal
           discId={concluir.discId}
