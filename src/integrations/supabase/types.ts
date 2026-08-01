@@ -209,6 +209,39 @@ export type Database = {
         }
         Relationships: []
       }
+      redacoes: {
+        Row: {
+          criado_em: string
+          feedback_json: Json | null
+          id: string
+          nota: number | null
+          tema: string
+          texto: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          criado_em?: string
+          feedback_json?: Json | null
+          id?: string
+          nota?: number | null
+          tema: string
+          texto: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          criado_em?: string
+          feedback_json?: Json | null
+          id?: string
+          nota?: number | null
+          tema?: string
+          texto?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string
