@@ -288,3 +288,89 @@ export async function clearDisciplineSkipStreak(
     .eq('disciplina_id', discId)
   if (error) console.error('Erro ao zerar sequência de pulos:', error)
 }
+
+// ---------- Redações (tema gerado por IA + correção) ----------
+
+export type Redacao = {
+  id: string
+  tema: string
+  texto: string
+  nota: number | null
+  feedback: Record<string, string> | null
+  comentario: string | null
+  criadoEm: string
+}
+
+type RedacaoRow = {
+  id: string
+  tema: string
+  texto: string
+  nota: number | string | null
+  feedback_json: unknown
+  criado_em: string
+}
+
+function mapRedacao(row: RedacaoRow): Redacao {
+  const fb = (row.feedback_json ?? null) as
+    | ({ comentario?: string } & Record<string, unknown>)
+    | null
+  const criterios = fb ? { ...fb } : null
+  let comentario: string | null = null
+  if (criterios && typeof criterios.comentario === 'string') {
+    comentario = criterios.comentario
+    delete criterios.comentario
+  }
+  return {
+    id: row.id,
+    tema: row.tema,
+    texto: row.texto,
+    nota: row.nota === null ? null : Number(row.nota),
+    feedback: (criterios as Record<string, string> | null) ?? null,
+    comentario,
+    criadoEm: row.criado_em,
+  }
+}
+
+export async function fetchRedacoes(userId: string): Promise<Redacao[]> {
+  const { data, error } = await supabase
+    .from('redacoes')
+    .select('id, tema, texto, nota, feedback_json, criado_em')
+    .eq('user_id', userId)
+    .order('criado_em', { ascending: false })
+
+  if (error) {
+    console.error('Erro ao buscar redações:', error)
+    return []
+  }
+  return (data ?? []).map((row) => mapRedacao(row as unknown as RedacaoRow))
+}
+
+export async function insertRedacao(
+  userId: string,
+  input: {
+    tema: string
+    texto: string
+    nota: number | null
+    feedback: Record<string, string> | null
+    comentario?: string | null
+  }
+): Promise<Redacao> {
+  const feedbackJson = input.feedback
+    ? ({ ...input.feedback, ...(input.comentario ? { comentario: input.comentario } : {}) } as Json)
+    : null
+
+  const { data, error } = await supabase
+    .from('redacoes')
+    .insert({
+      user_id: userId,
+      tema: input.tema,
+      texto: input.texto,
+      nota: input.nota,
+      feedback_json: feedbackJson,
+    })
+    .select('id, tema, texto, nota, feedback_json, criado_em')
+    .single()
+
+  if (error) throw error
+  return mapRedacao(data as unknown as RedacaoRow)
+}
