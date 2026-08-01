@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Lancamento } from './curriculum'
+import type { DisciplineSkips, Lancamento, SkipState } from './curriculum'
 import type { Json } from '@/integrations/supabase/types'
 
 // ============================================================================
@@ -225,4 +225,66 @@ export async function upsertUserSettings(
     .from('user_settings')
     .upsert({ user_id: userId, settings: settings as Json }, { onConflict: 'user_id' })
   if (error) console.error('Erro ao salvar configurações:', error)
+}
+
+// ---------- Pulos de disciplina (trava da disciplina ativa) ----------
+
+export async function fetchDisciplineSkips(userId: string): Promise<DisciplineSkips> {
+  const { data, error } = await supabase
+    .from('discipline_skips')
+    .select('disciplina_id, skip_count, consecutive_skips')
+    .eq('user_id', userId)
+
+  if (error) {
+    console.error('Erro ao buscar pulos de disciplina:', error)
+    return {}
+  }
+
+  const out: DisciplineSkips = {}
+  for (const row of data ?? []) {
+    out[row.disciplina_id] = {
+      skipCount: row.skip_count,
+      consecutiveSkips: row.consecutive_skips,
+    }
+  }
+  return out
+}
+
+/** Registra um pulo: incrementa total e sequência (urgência escalonada). */
+export async function registerDisciplineSkip(
+  userId: string,
+  discId: string,
+  current?: SkipState
+): Promise<SkipState> {
+  const next: SkipState = {
+    skipCount: (current?.skipCount ?? 0) + 1,
+    consecutiveSkips: (current?.consecutiveSkips ?? 0) + 1,
+  }
+
+  const { error } = await supabase.from('discipline_skips').upsert(
+    {
+      user_id: userId,
+      disciplina_id: discId,
+      skip_count: next.skipCount,
+      consecutive_skips: next.consecutiveSkips,
+      last_skipped_at: new Date().toISOString(),
+    },
+    { onConflict: 'user_id,disciplina_id' }
+  )
+  if (error) throw error
+
+  return next
+}
+
+/** Zera a sequência de pulos quando a disciplina é efetivamente concluída. */
+export async function clearDisciplineSkipStreak(
+  userId: string,
+  discId: string
+): Promise<void> {
+  const { error } = await supabase
+    .from('discipline_skips')
+    .update({ consecutive_skips: 0 })
+    .eq('user_id', userId)
+    .eq('disciplina_id', discId)
+  if (error) console.error('Erro ao zerar sequência de pulos:', error)
 }

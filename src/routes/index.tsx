@@ -24,10 +24,19 @@ import {
   disciplineTopicsWithMastery,
   maxTopicsForDiscipline,
   type AllocatedTopic,
+  type DisciplineSkips,
   type Lancamento,
 } from '@/lib/curriculum'
 import { useAuth } from '@/lib/auth-context'
-import { fetchLancamentos, insertLancamentos, deleteLancamento as deleteLancamentoDb, deleteAllLancamentos } from '@/lib/db'
+import {
+  fetchLancamentos,
+  insertLancamentos,
+  deleteLancamento as deleteLancamentoDb,
+  deleteAllLancamentos,
+  fetchDisciplineSkips,
+  registerDisciplineSkip,
+  clearDisciplineSkipStreak,
+} from '@/lib/db'
 import { CicloView } from '@/components/views/ciclo-view'
 import { NucleoView } from '@/components/views/nucleo-view'
 import { MateriaisView } from '@/components/views/materiais-view'
@@ -94,6 +103,7 @@ function OperacaoPMSC() {
   const { user, loading: authLoading, signOut } = useAuth()
   const [view, setView] = useState<ViewId>('ciclo')
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
+  const [skips, setSkips] = useState<DisciplineSkips>({})
   const [dataLoading, setDataLoading] = useState(true)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [material, setMaterial] = useState<{ discId: string; topicId: string } | null>(null)
@@ -111,11 +121,14 @@ function OperacaoPMSC() {
     if (!user) return
     let cancelled = false
     setDataLoading(true)
-    fetchLancamentos(user.id).then((rows) => {
-      if (cancelled) return
-      setLancamentos(rows)
-      setDataLoading(false)
-    })
+    Promise.all([fetchLancamentos(user.id), fetchDisciplineSkips(user.id)]).then(
+      ([rows, skipRows]) => {
+        if (cancelled) return
+        setLancamentos(rows)
+        setSkips(skipRows)
+        setDataLoading(false)
+      },
+    )
     return () => {
       cancelled = true
     }
@@ -136,6 +149,14 @@ function OperacaoPMSC() {
       if (!user) return
       const saved = await insertLancamentos(user.id, entries)
       setLancamentos((prev) => [...prev, ...saved])
+      // Concluir a disciplina zera a urgência acumulada por pulos.
+      const discIds = [...new Set(saved.map((s) => s.disciplinaId))]
+      await Promise.all(discIds.map((d) => clearDisciplineSkipStreak(user.id, d)))
+      setSkips((prev) => {
+        const next = { ...prev }
+        for (const d of discIds) if (next[d]) next[d] = { ...next[d], consecutiveSkips: 0 }
+        return next
+      })
       setConcluir(null)
       setView('ciclo')
     },
@@ -161,6 +182,15 @@ function OperacaoPMSC() {
     await deleteAllLancamentos(user.id)
     setLancamentos([])
   }, [user])
+
+  const skipDiscipline = useCallback(
+    async (discId: string) => {
+      if (!user) return
+      const next = await registerDisciplineSkip(user.id, discId, skips[discId])
+      setSkips((prev) => ({ ...prev, [discId]: next }))
+    },
+    [user, skips],
+  )
 
   const openMaterial = useCallback((discId: string, topicId: string) => {
     setMaterial({ discId, topicId })
@@ -296,6 +326,7 @@ function OperacaoPMSC() {
             {view === 'ciclo' && (
               <CicloView
                 lancamentos={lancamentos}
+                skips={skips}
                 onOpenMaterial={openMaterial}
                 onConcluir={openConcluir}
               />
@@ -303,7 +334,10 @@ function OperacaoPMSC() {
             {view === 'nucleo' && (
               <NucleoView
                 lancamentos={lancamentos}
+                skips={skips}
                 onOpenMaterial={openMaterial}
+                onEstudar={openConcluir}
+                onSkip={skipDiscipline}
               />
             )}
             {view === 'materiais' && (

@@ -74,6 +74,39 @@ export type Database = {
         }
         Relationships: []
       }
+      discipline_skips: {
+        Row: {
+          consecutive_skips: number
+          created_at: string
+          disciplina_id: string
+          id: string
+          last_skipped_at: string | null
+          skip_count: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          consecutive_skips?: number
+          created_at?: string
+          disciplina_id: string
+          id?: string
+          last_skipped_at?: string | null
+          skip_count?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          consecutive_skips?: number
+          created_at?: string
+          disciplina_id?: string
+          id?: string
+          last_skipped_at?: string | null
+          skip_count?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       lancamentos: {
         Row: {
           acertos: number
