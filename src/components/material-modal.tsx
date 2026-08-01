@@ -32,16 +32,20 @@ export function MaterialModal({
   discId,
   topicId,
   onClose,
+  onRedacaoNota,
 }: {
   discId: string
   topicId: string
   onClose: () => void
+  onRedacaoNota?: (nota: number) => void
 }) {
   const topic = CURRICULUM[discId].topics.find((t) => t.id === topicId)!
   const discName = CURRICULUM[discId].name
+  const isRedacao = discId === 'redacao'
   const { user } = useAuth()
   const [activeTab, setActiveTab] = useState<TabId>('leiseca')
   const [cache, setCache] = useState<Record<string, TabState>>({})
+
 
   // Links salvos para a aba "Lei Seca" (persistidos no Supabase, por usuário)
   const [links, setLinks] = useState<SavedLink[]>([])
