@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start'
 import { z } from 'zod'
 
 const inputSchema = z.object({
-  kind: z.enum(['leiseca', 'resumo', 'questoes', 'briefing']),
+  kind: z.enum(['leiseca', 'resumo', 'questoes', 'briefing', 'redacao-tema']),
   discName: z.string().optional(),
   topicName: z.string().optional(),
   summary: z.string().optional(),
@@ -19,10 +19,48 @@ function buildPrompt(body: Body): string {
       return `Você é professor de cursinho para o concurso de Soldado da PM de Santa Catarina (banca AOCP). Tópico: "${topicName}" (disciplina: ${discName}).\n\nEscreva um resumo direto (400-500 palavras) com o que mais cai em prova: conceitos centrais, pegadinhas típicas da banca AOCP e exceções cobradas como "incorreta". Use marcadores quando ajudar. Sintetize com suas próprias palavras.`
     case 'questoes':
       return `Você é professor de cursinho para o concurso de Soldado da PM de Santa Catarina (banca AOCP). Tópico: "${topicName}" (disciplina: ${discName}).\n\nDeixe claro no início que são questões de TREINO inéditas, não questões reais de provas anteriores. Depois crie 3 questões de múltipla escolha originais no estilo AOCP sobre este tópico, 4 alternativas (A-D) cada, indique a correta e explique objetivamente por que cada alternativa errada está errada.`
+    case 'redacao-tema':
+      return `Você é banca examinadora de redação do concurso de Soldado da PM de Santa Catarina 2026 (Instituto AOCP). Gere UM tema inédito de redação dissertativo-argumentativa, ancorado nos assuntos previstos no edital do PMSC: segurança pública, direitos humanos, cidadania, ética e disciplina militar, atualidades brasileiras e catarinenses.\n\nFormato da resposta em markdown, exatamente nesta ordem e sem qualquer texto extra:\n\n**Tema:** uma frase clara.\n\n**Proposta:** 2 a 3 linhas contextualizando e definindo a tarefa (posicionamento + argumentação + proposta de intervenção), no estilo de comando de prova.\n\n**Repertório sugerido:** 3 bullets curtos de dados, leis ou fatos que podem sustentar a argumentação.\n\nLimite: 20 a 30 linhas de texto. Não escreva a redação.`
     case 'briefing':
       return `Você é um coach de estudos para o concurso de Soldado da PM de Santa Catarina (banca AOCP). Desempenho real do candidato por tópico (peso 1-21, maior = mais cobrado; "sem dados" = nunca praticado):\n\n${summary}\n\nEscreva um briefing curto (150-200 palavras), tom direto de coach experiente: aponte 2-3 pontos mais urgentes desta semana (cruzando peso alto com desempenho fraco ou sem dados), reconheça o que já está bem encaminhado e termine com uma recomendação prática de tempo de estudo.`
   }
 }
+
+async function callGateway(
+  messages: { role: string; content: string }[],
+  maxTokens = 1600,
+): Promise<{ text: string } | { error: string }> {
+  try {
+    const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.LOVABLE_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'google/gemini-3-flash-preview',
+        messages,
+        max_completion_tokens: maxTokens,
+      }),
+    })
+    if (res.status === 429)
+      return { error: 'Limite de requisições atingido. Aguarde um momento e tente novamente.' }
+    if (res.status === 402)
+      return { error: 'Créditos de IA esgotados. Adicione créditos no workspace Lovable.' }
+    if (!res.ok) {
+      console.error('AI gateway error', res.status, await res.text())
+      return { error: `Falha na geração (HTTP ${res.status}).` }
+    }
+    const json = (await res.json()) as { choices?: { message?: { content?: string } }[] }
+    const text = json.choices?.[0]?.message?.content ?? ''
+    if (!text) return { error: 'A IA retornou uma resposta vazia.' }
+    return { text }
+  } catch (err) {
+    console.error(err)
+    return { error: 'Não foi possível conectar ao serviço de IA.' }
+  }
+}
+
 
 export const generateStudyMaterial = createServerFn({ method: 'POST' })
   .inputValidator((data: unknown) => inputSchema.parse(data))
