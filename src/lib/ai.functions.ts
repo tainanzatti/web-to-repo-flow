@@ -61,36 +61,68 @@ async function callGateway(
   }
 }
 
-
 export const generateStudyMaterial = createServerFn({ method: 'POST' })
   .inputValidator((data: unknown) => inputSchema.parse(data))
-  .handler(async ({ data }): Promise<{ text: string } | { error: string }> => {
-    const prompt = buildPrompt(data)
-    try {
-      const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${process.env.LOVABLE_API_KEY}`,
-          'Content-Type': 'application/json',
+  .handler(async ({ data }): Promise<{ text: string } | { error: string }> =>
+    callGateway([{ role: 'user', content: buildPrompt(data) }]),
+  )
+
+// ---------- Correção de redação ----------
+
+const redacaoSchema = z.object({
+  tema: z.string().min(1),
+  texto: z.string().min(1),
+})
+
+export type RedacaoFeedback = {
+  compreensao_do_tema: string
+  argumentacao: string
+  estrutura_coesao: string
+  norma_culta: string
+  conclusao_proposta: string
+}
+
+export type CorrecaoResult = { nota: number; feedback: RedacaoFeedback; comentario?: string }
+
+export const corrigirRedacao = createServerFn({ method: 'POST' })
+  .inputValidator((data: unknown) => redacaoSchema.parse(data))
+  .handler(async ({ data }): Promise<CorrecaoResult | { error: string }> => {
+    const prompt = `Você é corretor de redação do concurso de Soldado da PMSC 2026 (Instituto AOCP). Corrija a redação dissertativo-argumentativa abaixo com rigor de banca, mas de forma justa e construtiva.
+
+Tema proposto:
+${data.tema}
+
+Redação do candidato:
+${data.texto}
+
+Avalie cada critério em 2 a 4 frases, apontando erros concretos e como corrigir. Dê nota final de 0 a 10 (pode ter uma casa decimal).
+
+Responda APENAS com JSON válido, sem markdown, no formato:
+{"nota": 7.5, "comentario": "duas frases de veredito geral", "feedback": {"compreensao_do_tema": "...", "argumentacao": "...", "estrutura_coesao": "...", "norma_culta": "...", "conclusao_proposta": "..."}}`
+
+    const res = await callGateway(
+      [
+        {
+          role: 'system',
+          content: 'Você responde exclusivamente com JSON válido, sem cercas de código.',
         },
-        body: JSON.stringify({
-          model: 'google/gemini-3-flash-preview',
-          messages: [{ role: 'user', content: prompt }],
-          max_completion_tokens: 1600,
-        }),
-      })
-      if (res.status === 429) return { error: 'Limite de requisições atingido. Aguarde um momento e tente novamente.' }
-      if (res.status === 402) return { error: 'Créditos de IA esgotados. Adicione créditos no workspace Lovable.' }
-      if (!res.ok) {
-        console.error('AI gateway error', res.status, await res.text())
-        return { error: `Falha na geração (HTTP ${res.status}).` }
-      }
-      const json = (await res.json()) as { choices?: { message?: { content?: string } }[] }
-      const text = json.choices?.[0]?.message?.content ?? ''
-      if (!text) return { error: 'A IA retornou uma resposta vazia.' }
-      return { text }
-    } catch (err) {
-      console.error(err)
-      return { error: 'Não foi possível conectar ao serviço de IA.' }
+        { role: 'user', content: prompt },
+      ],
+      2000,
+    )
+    if ('error' in res) return res
+
+    const cleaned = res.text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim()
+    const start = cleaned.indexOf('{')
+    const end = cleaned.lastIndexOf('}')
+    if (start === -1 || end === -1) return { error: 'Resposta da IA em formato inesperado.' }
+    try {
+      const parsed = JSON.parse(cleaned.slice(start, end + 1)) as CorrecaoResult
+      const nota = Math.max(0, Math.min(10, Number(parsed.nota)))
+      if (Number.isNaN(nota)) return { error: 'A IA não retornou uma nota válida.' }
+      return { nota, feedback: parsed.feedback, comentario: parsed.comentario }
+    } catch {
+      return { error: 'Não foi possível interpretar a correção da IA.' }
     }
   })
+
