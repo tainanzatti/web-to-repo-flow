@@ -174,7 +174,7 @@ function ActiveDisciplineCard({
               {explainPriority(score)}.
             </p>
             {vezesPulada > 0 && (
-              <p className="mt-1 font-mono text-[10px] text-warning">
+              <p className="mt-1 font-mono text-[10px] text-tier-mid">
                 Registrada como pulada {vezesPulada}× no total.
               </p>
             )}
@@ -261,9 +261,9 @@ function ActiveDisciplineCard({
           </div>
 
           {confirmSkip && onSkip && (
-            <div className="rounded-lg border border-warning/50 bg-warning/[0.07] p-3">
+            <div className="rounded-lg border border-tier-mid/50 bg-tier-mid/[0.07] p-3">
               <div className="flex items-start gap-2">
-                <AlertTriangle size={14} className="mt-0.5 shrink-0 text-warning" />
+                <AlertTriangle size={14} className="mt-0.5 shrink-0 text-tier-mid" />
                 <p className="text-[12px] leading-relaxed text-foreground">
                   Pular não te livra dela — ela volta com prioridade maior e fica registrado.
                 </p>
@@ -272,7 +272,7 @@ function ActiveDisciplineCard({
                 <button
                   onClick={handleSkip}
                   disabled={skipping}
-                  className="rounded-lg bg-warning px-3 py-2 text-[12px] font-semibold text-background transition hover:opacity-90 disabled:opacity-60"
+                  className="rounded-lg bg-tier-mid px-3 py-2 text-[12px] font-semibold text-background transition hover:opacity-90 disabled:opacity-60"
                 >
                   {skipping ? 'Registrando…' : 'Confirmar pulo'}
                 </button>
