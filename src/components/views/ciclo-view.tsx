@@ -30,6 +30,7 @@ import {
   computeStreak,
   maxTopicsForDiscipline,
   movingAverageMastery,
+  type DisciplineSkips,
   type Lancamento,
 } from '@/lib/curriculum'
 import { generateAI } from '@/lib/ai-client'
@@ -41,6 +42,7 @@ import { StudyWheel } from '@/components/study-wheel'
 
 type Props = {
   lancamentos: Lancamento[]
+  skips?: DisciplineSkips
   onOpenMaterial: (discId: string, topicId: string) => void
   onConcluir: (discId: string) => void
 }
@@ -189,10 +191,10 @@ function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
   )
 }
 
-function CicloViewInner({ lancamentos, onOpenMaterial, onConcluir }: Props) {
+function CicloViewInner({ lancamentos, skips = {}, onOpenMaterial, onConcluir }: Props) {
   const cycleStats = useMemo(() => computeCycleStats(lancamentos), [lancamentos])
   const cycleNumber = cycleStats.completedCycles + 1
-  const heroDiscId = useMemo(() => nextHeroDiscipline(lancamentos), [lancamentos])
+  const heroDiscId = useMemo(() => nextHeroDiscipline(lancamentos, skips), [lancamentos, skips])
   const [selectedDiscId, setSelectedDiscId] = useState(heroDiscId)
 
   // Rotação automática: ao concluir uma sessão, o "herói" avança na sequência
