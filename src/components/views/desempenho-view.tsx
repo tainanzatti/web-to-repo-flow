@@ -1,101 +1,203 @@
-import { useEffect, useState, useMemo } from 'react'
-import { TrendingUp, AlertTriangle, SkipForward } from 'lucide-react'
+import { memo, useMemo } from 'react'
 import {
-  fetchDisciplines, fetchAllTopics, fetchLancamentos, fetchSkipCounts, fetchQuestaoLancamentos,
-} from '../../lib/db'
-import type { Discipline, Topic, Lancamento, SkipCount, QuestaoLancamento } from '../../lib/types'
-import { computeDisciplineMastery } from '../../lib/curriculum'
+  ResponsiveContainer,
+  RadarChart,
+  PolarGrid,
+  PolarAngleAxis,
+  Radar,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  CartesianGrid,
+} from 'recharts'
+import { ClipboardCheck, CheckCircle2, XCircle, Gauge, Zap, TrendingUp } from 'lucide-react'
+import { CURRICULUM, ROTATION_ORDER, disciplineAggregate, type Lancamento } from '@/lib/curriculum'
+import { SectionLabel } from '@/components/ui-bits'
 
-export default function DesempenhoView() {
-  const [disciplines, setDisciplines] = useState<Discipline[]>([])
-  const [topics, setTopics] = useState<Topic[]>([])
-  const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
-  const [skipCounts, setSkipCounts] = useState<SkipCount[]>([])
-  const [questoes, setQuestoes] = useState<QuestaoLancamento[]>([])
-  const [loading, setLoading] = useState(true)
+type Props = { lancamentos: Lancamento[] }
 
-  useEffect(() => {
-    Promise.all([fetchDisciplines(), fetchAllTopics(), fetchLancamentos(), fetchSkipCounts(), fetchQuestaoLancamentos()])
-      .then(([d, t, l, s, q]) => {
-        setDisciplines(d); setTopics(t); setLancamentos(l); setSkipCounts(s); setQuestoes(q)
-        setLoading(false)
-      })
-  }, [])
+const TIME_WINDOWS = [90, 60, 30, 15, 7]
 
-  const rows = useMemo(() => {
-    return disciplines.map((d) => {
-      const dm = computeDisciplineMastery(d, topics, lancamentos)
-      const skip = skipCounts.find((s) => s.disciplina_id === d.id)
-      const discQ = questoes.filter((q) => q.disciplina_id === d.id)
-      const totalQ = discQ.reduce((s, q) => s + q.quantidade, 0)
-      const acertosQ = discQ.reduce((s, q) => s + q.acertos, 0)
-      return {
-        discipline: d, masteryMedio: dm.masteryMedio, topicsTotal: dm.topics.length,
-        topicsNaoIniciados: dm.topicsNaoIniciados, topicsDominados: dm.topicsDominados,
-        topicsResurgir: dm.topicsResurgir.length, vezesPulada: skip?.vezes_pulada ?? 0,
-        multiplicador: skip ? Number(skip.multiplicador_urgencia) : 1,
-        aproveitamento: totalQ > 0 ? Math.round((acertosQ / totalQ) * 100) : 0, totalQuestoes: totalQ,
-      }
+function pctInWindow(lancamentos: Lancamento[], discId: string, days: number): number | null {
+  const cutoff = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10)
+  const entries = lancamentos.filter((l) => l.disciplinaId === discId && l.data >= cutoff)
+  const q = entries.reduce((a, e) => a + e.quantidade, 0)
+  const a = entries.reduce((s, e) => s + e.acertos, 0)
+  return q > 0 ? Math.round((a / q) * 100) : null
+}
+
+function DesempenhoViewInner({ lancamentos }: Props) {
+  const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
+  const totalA = lancamentos.reduce((a, e) => a + e.acertos, 0)
+  const totalMin = lancamentos.reduce((a, e) => a + (e.minutos || 0), 0)
+  const pct = totalQ > 0 ? Math.round((totalA / totalQ) * 100) : 0
+  const qHora = totalMin > 0 ? (totalQ / (totalMin / 60)).toFixed(1) : '0.0'
+
+  const radarData = ROTATION_ORDER.filter((id) => CURRICULUM[id].questoes !== 'P2').map((id) => ({
+    disciplina: CURRICULUM[id].name.replace('Direito ', 'D. ').replace('Legislação ', 'Leg. '),
+    valor: disciplineAggregate(lancamentos, id).pct ?? 0,
+  }))
+
+  const monthly = useMemo(() => {
+    const map = new Map<string, { q: number; a: number }>()
+    lancamentos.forEach((l) => {
+      const key = l.data.slice(0, 7)
+      const cur = map.get(key) || { q: 0, a: 0 }
+      cur.q += l.quantidade
+      cur.a += l.acertos
+      map.set(key, cur)
     })
-  }, [disciplines, topics, lancamentos, skipCounts, questoes])
+    return [...map.entries()]
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .map(([month, v]) => ({
+        month: month.split('-').reverse().join('/'),
+        pct: v.q > 0 ? Math.round((v.a / v.q) * 100) : 0,
+      }))
+  }, [lancamentos])
 
-  if (loading) return <div className="loading-spinner">Carregando desempenho...</div>
+  const stats = [
+    { label: 'Questões resolvidas', value: totalQ, icon: ClipboardCheck, accent: '#4a86c7' },
+    { label: 'Questões certas', value: totalA, icon: CheckCircle2, accent: 'var(--success)' },
+    { label: 'Questões erradas', value: totalQ - totalA, icon: XCircle, accent: 'var(--primary)' },
+    { label: 'Taxa de acertos', value: `${pct}%`, icon: Gauge, accent: 'var(--tier-good)' },
+    { label: 'Questões/hora', value: `${qHora}/h`, icon: Zap, accent: 'var(--tier-mid)' },
+  ]
 
   return (
-    <div className="view-container">
-      <div className="view-header">
-        <h1 className="view-title">Desempenho</h1>
-        <p className="view-subtitle">Visão detalhada por disciplina, incluindo evasão e tópicos que precisam de resurgimento.</p>
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        {stats.map((s) => (
+          <div key={s.label} className="card-hover rounded-xl border border-border-soft bg-card p-4">
+            <div className="mb-2 flex items-center justify-between">
+              <span className="text-[11px] font-medium text-muted-foreground">{s.label}</span>
+              <s.icon size={14} style={{ color: s.accent }} />
+            </div>
+            <div className="font-mono text-2xl font-bold text-foreground">{s.value}</div>
+          </div>
+        ))}
       </div>
-      <div className="card" style={{ overflowX: 'auto', padding: 0 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-          <thead>
-            <tr style={{ borderBottom: '2px solid var(--border)' }}>
-              <Th>Disciplina</Th><Th>Domínio</Th><Th>Tópicos</Th><Th>Não iniciados</Th>
-              <Th>Dominados</Th><Th>Resurgir</Th><Th>Questões</Th><Th>Aprov.</Th>
-              <Th><SkipForward size={14} style={{ verticalAlign: 'middle' }} />{' '}Pulos</Th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.discipline.id} style={{ borderBottom: '1px solid var(--border)' }}>
-                <Td>
-                  <span style={{ fontWeight: 600 }}>{r.discipline.nome}</span>
-                  <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 6 }}>peso {r.discipline.peso_edital}</span>
-                </Td>
-                <Td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ width: 50, height: 6, borderRadius: 3, background: 'var(--neutral-700)', overflow: 'hidden' }}>
-                      <div className={`mastery-bar-fill ${r.masteryMedio < 40 ? 'low' : r.masteryMedio < 70 ? 'mid' : 'high'}`} style={{ width: `${r.masteryMedio}%`, height: '100%' }} />
-                    </div>
-                    <span style={{ fontSize: 13, fontWeight: 600 }}>{Math.round(r.masteryMedio)}%</span>
-                  </div>
-                </Td>
-                <Td>{r.topicsTotal}</Td>
-                <Td>{r.topicsNaoIniciados > 0 ? <span className="badge badge-error">{r.topicsNaoIniciados}</span> : <span style={{ color: 'var(--text-muted)' }}>0</span>}</Td>
-                <Td>{r.topicsDominados > 0 ? <span className="badge badge-success">{r.topicsDominados}</span> : <span style={{ color: 'var(--text-muted)' }}>0</span>}</Td>
-                <Td>{r.topicsResurgir > 0 ? <span className="badge badge-warning" style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}><AlertTriangle size={11} />{r.topicsResurgir}</span> : <span style={{ color: 'var(--text-muted)' }}>0</span>}</Td>
-                <Td>{r.totalQuestoes}</Td>
-                <Td>{r.totalQuestoes > 0 ? <span style={{ color: r.aproveitamento >= 60 ? 'var(--success-light)' : 'var(--warning-light)', fontWeight: 600 }}>{r.aproveitamento}%</span> : <span style={{ color: 'var(--text-muted)' }}>—</span>}</Td>
-                <Td>{r.vezesPulada > 0 ? <span className="badge badge-error" title={`Multiplicador: ×${r.multiplicador.toFixed(1)}`}>{r.vezesPulada}x</span> : <span style={{ color: 'var(--text-muted)' }}>0</span>}</Td>
+
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="rounded-2xl border border-border-soft bg-card p-5">
+          <SectionLabel icon={Gauge}>DESEMPENHO POR DISCIPLINA</SectionLabel>
+          <div className="h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <RadarChart data={radarData} outerRadius="72%">
+                <PolarGrid stroke="var(--border)" />
+                <PolarAngleAxis
+                  dataKey="disciplina"
+                  tick={{ fill: 'var(--muted-foreground)', fontSize: 9 }}
+                />
+                <Radar
+                  dataKey="valor"
+                  stroke="var(--primary)"
+                  fill="var(--primary)"
+                  fillOpacity={0.35}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: 'var(--card-raised)',
+                    border: '1px solid var(--border)',
+                    borderRadius: 8,
+                    fontSize: 12,
+                  }}
+                  formatter={(v: number) => [`${v}%`, 'Acertos']}
+                />
+              </RadarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-border-soft bg-card p-5">
+          <SectionLabel icon={TrendingUp}>PERFORMANCE MENSAL</SectionLabel>
+          <div className="h-72">
+            {monthly.length === 0 ? (
+              <div className="flex h-full items-center justify-center text-xs text-faint">
+                Sem dados suficientes.
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={monthly} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis dataKey="month" tick={{ fill: 'var(--faint)', fontSize: 10 }} />
+                  <YAxis domain={[0, 100]} tick={{ fill: 'var(--faint)', fontSize: 10 }} />
+                  <Tooltip
+                    contentStyle={{
+                      background: 'var(--card-raised)',
+                      border: '1px solid var(--border)',
+                      borderRadius: 8,
+                      fontSize: 12,
+                    }}
+                    formatter={(v: number) => [`${v}%`, 'Acertos']}
+                  />
+                  <Line
+                    type="monotone"
+                    dataKey="pct"
+                    stroke="#4a86c7"
+                    strokeWidth={2}
+                    dot={{ r: 3, fill: '#4a86c7' }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </div>
+        </div>
+      </div>
+
+      <div className="rounded-2xl border border-border-soft bg-card p-5">
+        <SectionLabel>DETALHAMENTO POR JANELA DE TEMPO</SectionLabel>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border text-left font-mono text-[10px] uppercase tracking-wider text-faint">
+                <th className="pb-2 pr-4 font-medium">Disciplina</th>
+                <th className="pb-2 pr-4 text-center font-medium">Total</th>
+                <th className="pb-2 pr-4 text-center font-medium">Acertos</th>
+                <th className="pb-2 pr-4 text-center font-medium">Erros</th>
+                <th className="pb-2 pr-4 text-center font-medium">% Geral</th>
+                {TIME_WINDOWS.map((w) => (
+                  <th key={w} className="pb-2 pr-4 text-center font-medium text-primary">
+                    {w}d
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="card" style={{ marginTop: 20, display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-        <TrendingUp size={20} color="var(--primary-light)" style={{ flexShrink: 0, marginTop: 2 }} />
-        <div style={{ fontSize: 14, color: 'var(--text-secondary)' }}>
-          <strong style={{ color: 'var(--text)' }}>Resurgimento espaçado:</strong> tópicos dominados há mais de 25 dias sem revisão voltam à fila como teste de manutenção (5-10 min).
+            </thead>
+            <tbody>
+              {ROTATION_ORDER.map((id) => {
+                const agg = disciplineAggregate(lancamentos, id)
+                return (
+                  <tr key={id} className="border-b border-border-soft/60 text-muted-foreground">
+                    <td className="py-2.5 pr-4 font-medium text-foreground">{CURRICULUM[id].name}</td>
+                    <td className="py-2.5 pr-4 text-center font-mono">{agg.quantidade}</td>
+                    <td className="py-2.5 pr-4 text-center font-mono">{agg.acertos}</td>
+                    <td className="py-2.5 pr-4 text-center font-mono">
+                      {agg.quantidade - agg.acertos}
+                    </td>
+                    <td className="py-2.5 pr-4 text-center font-mono font-semibold">
+                      <PctCell value={agg.pct} />
+                    </td>
+                    {TIME_WINDOWS.map((w) => (
+                      <td key={w} className="py-2.5 pr-4 text-center font-mono text-xs">
+                        <PctCell value={pctInWindow(lancamentos, id, w)} />
+                      </td>
+                    ))}
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>
   )
 }
 
-function Th({ children }: { children: React.ReactNode }) {
-  return <th style={{ padding: '12px 16px', textAlign: 'left', fontSize: 12, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em', whiteSpace: 'nowrap' }}>{children}</th>
+function PctCell({ value }: { value: number | null }) {
+  if (value === null) return <span className="text-faint">—</span>
+  const color = value >= 75 ? 'var(--success)' : value >= 50 ? 'var(--tier-mid)' : 'var(--primary)'
+  return <span style={{ color }}>{value}%</span>
 }
-function Td({ children }: { children: React.ReactNode }) {
-  return <td style={{ padding: '12px 16px', fontSize: 14, whiteSpace: 'nowrap' }}>{children}</td>
-}
+
+export const DesempenhoView = memo(DesempenhoViewInner)
