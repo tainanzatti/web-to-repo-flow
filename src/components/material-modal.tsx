@@ -13,6 +13,8 @@ import {
 } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
 import { TypewriterMarkdown } from '@/components/ui-bits'
+import { RedacaoPanel } from '@/components/redacao-panel'
+
 
 type TabId = 'leiseca' | 'resumo' | 'questoes'
 
