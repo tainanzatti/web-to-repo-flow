@@ -242,7 +242,7 @@ function PainelViewInner({ lancamentos, skips = {}, onEstudar, onVerNucleo, onOp
             <div className="space-y-2">
               {revisoesVencendo.slice(0, 5).map((r) => {
                 const disc = CURRICULUM[r.discId]
-                const topico = disc.topics.find((t) => t.id === r.topicoId ?? '')
+                const topico = disc.topics.find((t) => t.id === r.topicId)
                 return (
                   <button
                     key={`${r.discId}-${r.topicId}`}
