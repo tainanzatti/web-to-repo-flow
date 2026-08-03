@@ -2,6 +2,7 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useCallback, useEffect, useState } from 'react'
 import {
   PieChart,
+  Home,
   LayoutGrid,
   BookOpen,
   BarChart3,
@@ -37,6 +38,7 @@ import {
   registerDisciplineSkip,
   clearDisciplineSkipStreak,
 } from '@/lib/db'
+import { PainelView } from '@/components/views/painel-view'
 import { CicloView } from '@/components/views/ciclo-view'
 import { NucleoView } from '@/components/views/nucleo-view'
 import { MateriaisView } from '@/components/views/materiais-view'
@@ -54,6 +56,7 @@ export const Route = createFileRoute('/')({
 })
 
 type ViewId =
+  | 'painel'
   | 'ciclo'
   | 'nucleo'
   | 'materiais'
@@ -67,6 +70,7 @@ const NAV: { section: string; items: { id: ViewId; label: string; icon: LucideIc
   {
     section: 'Home',
     items: [
+      { id: 'painel', label: 'Painel', icon: Home },
       { id: 'ciclo', label: 'Ciclo', icon: PieChart },
       { id: 'nucleo', label: 'Núcleo', icon: LayoutGrid },
       { id: 'materiais', label: 'Materiais', icon: BookOpen },
@@ -88,6 +92,7 @@ const NAV: { section: string; items: { id: ViewId; label: string; icon: LucideIc
 ]
 
 const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = {
+  painel: { title: 'Painel', subtitle: 'Seu centro de comando do dia' },
   ciclo: { title: 'Ciclo de Estudos', subtitle: 'Rotação automática guiada pelos pesos do edital' },
   nucleo: { title: 'Núcleo', subtitle: 'Progresso de revisão por assunto do edital' },
   materiais: { title: 'Materiais', subtitle: '[PMSC] Soldado 2026 — materiais por assunto' },
@@ -101,7 +106,7 @@ const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = {
 function OperacaoPMSC() {
   const navigate = useNavigate()
   const { user, loading: authLoading, signOut } = useAuth()
-  const [view, setView] = useState<ViewId>('ciclo')
+  const [view, setView] = useState<ViewId>('painel')
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [skips, setSkips] = useState<DisciplineSkips>({})
   const [dataLoading, setDataLoading] = useState(true)
@@ -323,6 +328,15 @@ function OperacaoPMSC() {
             key={view}
             className="animate-in fade-in slide-in-from-bottom-1 duration-300 ease-in-out"
           >
+            {view === 'painel' && (
+              <PainelView
+                lancamentos={lancamentos}
+                skips={skips}
+                onEstudar={openConcluir}
+                onVerNucleo={() => setView('nucleo')}
+                onOpenMaterial={openMaterial}
+              />
+            )}
             {view === 'ciclo' && (
               <CicloView
                 lancamentos={lancamentos}
