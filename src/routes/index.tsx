@@ -399,6 +399,21 @@ function OperacaoPMSC() {
         </main>
       </div>
 
+      {focus && (
+        <FocusMode
+          discId={focus.discId}
+          topics={focus.topics}
+          onClose={() => setFocus(null)}
+          onConcluir={() => {
+            const d = focus.discId
+            setFocus(null)
+            openConcluir(d)
+          }}
+        />
+      )}
+
+
+
       {material && (
         <MaterialModal
           discId={material.discId}
