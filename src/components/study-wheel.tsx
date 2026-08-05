@@ -190,6 +190,24 @@ export function StudyWheel({
                   strokeLinejoin="round"
                 />
               )}
+              {locked && (
+                <g className="pointer-events-none" opacity={0.9}>
+                  <rect
+                    x={tip.x - 2.6}
+                    y={tip.y - 0.6}
+                    width={5.2}
+                    height={4.2}
+                    rx={1}
+                    fill="var(--muted-foreground)"
+                  />
+                  <path
+                    d={`M ${tip.x - 1.5} ${tip.y - 0.8} v -1.1 a 1.5 1.5 0 0 1 3 0 v 1.1`}
+                    fill="none"
+                    stroke="var(--muted-foreground)"
+                    strokeWidth={0.9}
+                  />
+                </g>
+              )}
             </g>
           )
         })}
