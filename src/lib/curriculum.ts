@@ -27,7 +27,13 @@ export type Lancamento = {
   data: string // YYYY-MM-DD
 }
 
-export type TopicWithMastery = Topic & { mastery: number | null }
+export type TopicWithMastery = Topic & {
+  mastery: number | null
+  /** Tópico dominado que voltou à fila apenas como teste de manutenção. */
+  maintenance?: boolean
+  /** Dias desde a última revisão deste tópico (null = nunca revisado). */
+  daysSinceReview?: number | null
+}
 export type AllocatedTopic = TopicWithMastery & { minutes: number }
 
 export const CURRICULUM: Record<string, Discipline> = {
