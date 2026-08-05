@@ -264,15 +264,48 @@ const TIER_MULT: Record<TierKey, number> = {
   dominado: 0.15,
 }
 
+// Fatia fixa de manutenção para tópicos dominados que ressurgiram (5–10 min conforme peso).
+export function maintenanceMinutes(fib: number): number {
+  return Math.max(5, Math.min(10, Math.round(5 + ((fib - 2) / (21 - 2)) * 5)))
+}
+
 // Distribui 60 min entre os tópicos ativos, respeitando peso Fibonacci + domínio.
+// Tópicos em "manutenção" (dominados que ressurgiram) recebem apenas uma fatia fixa curta;
+// o restante do tempo é dividido normalmente entre os demais.
 export function allocateMinutes(activeTopics: TopicWithMastery[]): AllocatedTopic[] {
   if (activeTopics.length === 0) return []
-  const sumFib = activeTopics.reduce((a, t) => a + t.fib, 0)
-  const base = activeTopics.map((t) => (t.fib / sumFib) * 60)
-  const adjusted = activeTopics.map((t, i) => base[i] * TIER_MULT[tierInfo(t.mastery).key])
+
+  const maintenanceIdx = activeTopics
+    .map((t, i) => (t.maintenance ? i : -1))
+    .filter((i) => i >= 0)
+  const mainIdx = activeTopics.map((_, i) => i).filter((i) => !maintenanceIdx.includes(i))
+
+  const result = new Array<number>(activeTopics.length).fill(0)
+
+  // Se só há tópicos de manutenção, dividem a hora inteira entre si.
+  if (mainIdx.length === 0) {
+    const each = Math.round(60 / activeTopics.length)
+    activeTopics.forEach((_, i) => (result[i] = each))
+    const rest = 60 - result.reduce((a, b) => a + b, 0)
+    result[0] += rest
+    return activeTopics.map((t, i) => ({ ...t, minutes: result[i] }))
+  }
+
+  let budget = 60
+  for (const i of maintenanceIdx) {
+    const m = maintenanceMinutes(activeTopics[i].fib)
+    result[i] = m
+    budget -= m
+  }
+  budget = Math.max(mainIdx.length, budget)
+
+  const main = mainIdx.map((i) => activeTopics[i])
+  const sumFib = main.reduce((a, t) => a + t.fib, 0)
+  const base = main.map((t) => (t.fib / sumFib) * budget)
+  const adjusted = main.map((t, i) => base[i] * TIER_MULT[tierInfo(t.mastery).key])
   const freed = base.reduce((a, b) => a + b, 0) - adjusted.reduce((a, b) => a + b, 0)
 
-  const recipients = activeTopics
+  const recipients = main
     .map((t, i) => ({ i, fib: t.fib, tier: tierInfo(t.mastery).key }))
     .filter((r) => r.tier !== 'dominado')
     .sort((a, b) => b.fib - a.fib)
@@ -284,9 +317,11 @@ export function allocateMinutes(activeTopics: TopicWithMastery[]): AllocatedTopi
   }
 
   const minutes = finalRaw.map((m) => Math.max(1, Math.round(m)))
-  const diff = 60 - minutes.reduce((a, b) => a + b, 0)
+  const diff = budget - minutes.reduce((a, b) => a + b, 0)
   if (diff !== 0) minutes[minutes.indexOf(Math.max(...minutes))] += diff
-  return activeTopics.map((t, i) => ({ ...t, minutes: minutes[i] }))
+  mainIdx.forEach((origIdx, k) => (result[origIdx] = minutes[k]))
+
+  return activeTopics.map((t, i) => ({ ...t, minutes: result[i] }))
 }
 
 export function disciplineTopicsWithMastery(
