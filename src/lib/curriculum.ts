@@ -27,7 +27,13 @@ export type Lancamento = {
   data: string // YYYY-MM-DD
 }
 
-export type TopicWithMastery = Topic & { mastery: number | null }
+export type TopicWithMastery = Topic & {
+  mastery: number | null
+  /** Tópico dominado que voltou à fila apenas como teste de manutenção. */
+  maintenance?: boolean
+  /** Dias desde a última revisão deste tópico (null = nunca revisado). */
+  daysSinceReview?: number | null
+}
 export type AllocatedTopic = TopicWithMastery & { minutes: number }
 
 export const CURRICULUM: Record<string, Discipline> = {
@@ -225,6 +231,8 @@ export function tierInfo(mastery: number | null | undefined): TierInfo {
 
 export function explainAllocation(t: TopicWithMastery): string {
   const tier = tierInfo(t.mastery)
+  if (t.maintenance)
+    return `Dominado, mas sem revisão há ${t.daysSinceReview} dias — teste curto de manutenção.`
   if (tier.key === 'sem-dados') return `Ainda sem lançamentos — prioridade máxima (peso ${t.fib}).`
   if (tier.key === 'fraco') return `Média abaixo de 50% — mantém prioridade alta.`
   if (tier.key === 'mediano') return `Entre 50–75% — tempo reduzido, em consolidação.`
@@ -258,15 +266,48 @@ const TIER_MULT: Record<TierKey, number> = {
   dominado: 0.15,
 }
 
+// Fatia fixa de manutenção para tópicos dominados que ressurgiram (5–10 min conforme peso).
+export function maintenanceMinutes(fib: number): number {
+  return Math.max(5, Math.min(10, Math.round(5 + ((fib - 2) / (21 - 2)) * 5)))
+}
+
 // Distribui 60 min entre os tópicos ativos, respeitando peso Fibonacci + domínio.
+// Tópicos em "manutenção" (dominados que ressurgiram) recebem apenas uma fatia fixa curta;
+// o restante do tempo é dividido normalmente entre os demais.
 export function allocateMinutes(activeTopics: TopicWithMastery[]): AllocatedTopic[] {
   if (activeTopics.length === 0) return []
-  const sumFib = activeTopics.reduce((a, t) => a + t.fib, 0)
-  const base = activeTopics.map((t) => (t.fib / sumFib) * 60)
-  const adjusted = activeTopics.map((t, i) => base[i] * TIER_MULT[tierInfo(t.mastery).key])
+
+  const maintenanceIdx = activeTopics
+    .map((t, i) => (t.maintenance ? i : -1))
+    .filter((i) => i >= 0)
+  const mainIdx = activeTopics.map((_, i) => i).filter((i) => !maintenanceIdx.includes(i))
+
+  const result = new Array<number>(activeTopics.length).fill(0)
+
+  // Se só há tópicos de manutenção, dividem a hora inteira entre si.
+  if (mainIdx.length === 0) {
+    const each = Math.round(60 / activeTopics.length)
+    activeTopics.forEach((_, i) => (result[i] = each))
+    const rest = 60 - result.reduce((a, b) => a + b, 0)
+    result[0] += rest
+    return activeTopics.map((t, i) => ({ ...t, minutes: result[i] }))
+  }
+
+  let budget = 60
+  for (const i of maintenanceIdx) {
+    const m = maintenanceMinutes(activeTopics[i].fib)
+    result[i] = m
+    budget -= m
+  }
+  budget = Math.max(mainIdx.length, budget)
+
+  const main = mainIdx.map((i) => activeTopics[i])
+  const sumFib = main.reduce((a, t) => a + t.fib, 0)
+  const base = main.map((t) => (t.fib / sumFib) * budget)
+  const adjusted = main.map((t, i) => base[i] * TIER_MULT[tierInfo(t.mastery).key])
   const freed = base.reduce((a, b) => a + b, 0) - adjusted.reduce((a, b) => a + b, 0)
 
-  const recipients = activeTopics
+  const recipients = main
     .map((t, i) => ({ i, fib: t.fib, tier: tierInfo(t.mastery).key }))
     .filter((r) => r.tier !== 'dominado')
     .sort((a, b) => b.fib - a.fib)
@@ -278,9 +319,28 @@ export function allocateMinutes(activeTopics: TopicWithMastery[]): AllocatedTopi
   }
 
   const minutes = finalRaw.map((m) => Math.max(1, Math.round(m)))
-  const diff = 60 - minutes.reduce((a, b) => a + b, 0)
+  const diff = budget - minutes.reduce((a, b) => a + b, 0)
   if (diff !== 0) minutes[minutes.indexOf(Math.max(...minutes))] += diff
-  return activeTopics.map((t, i) => ({ ...t, minutes: minutes[i] }))
+  mainIdx.forEach((origIdx, k) => (result[origIdx] = minutes[k]))
+
+  return activeTopics.map((t, i) => ({ ...t, minutes: result[i] }))
+}
+
+// Dias desde a última revisão de um tópico específico (null = nunca revisado).
+export function daysSinceTopicReview(
+  lancamentos: Lancamento[],
+  discId: string,
+  topicId: string
+): number | null {
+  const entries = lancamentos
+    .filter((l) => l.disciplinaId === discId && l.topicoId === topicId)
+    .map((l) => l.data)
+    .sort()
+  if (entries.length === 0) return null
+  const today = new Date().toISOString().slice(0, 10)
+  return Math.round(
+    (new Date(today).getTime() - new Date(entries[entries.length - 1]).getTime()) / 86400000
+  )
 }
 
 export function disciplineTopicsWithMastery(
@@ -290,6 +350,7 @@ export function disciplineTopicsWithMastery(
   return CURRICULUM[discId].topics.map((t) => ({
     ...t,
     mastery: movingAverageMastery(lancamentos, discId, t.id),
+    daysSinceReview: daysSinceTopicReview(lancamentos, discId, t.id),
   }))
 }
 
@@ -509,6 +570,25 @@ const TIER_ORDER: Record<TierKey, number> = {
   dominado: 4,
 }
 
+// Janela de manutenção: tópico dominado sem revisão há mais de N dias volta à fila.
+export const MAINTENANCE_DUE_DAYS = 21
+// Nº máximo de tópicos de manutenção que podem ressurgir por sessão.
+const MAX_MAINTENANCE_SLOTS = 2
+
+// Tópicos dominados que já passaram da janela de manutenção, do mais esquecido para o menos.
+export function maintenanceDueTopics(
+  topicsWithMastery: TopicWithMastery[]
+): TopicWithMastery[] {
+  return topicsWithMastery
+    .filter(
+      (t) =>
+        tierInfo(t.mastery).key === 'dominado' &&
+        typeof t.daysSinceReview === 'number' &&
+        t.daysSinceReview >= MAINTENANCE_DUE_DAYS
+    )
+    .sort((a, b) => (b.daysSinceReview ?? 0) - (a.daysSinceReview ?? 0))
+}
+
 // Seleciona quais tópicos disputam a hora desta disciplina no ciclo atual.
 export function selectActiveTopics(
   topicsWithMastery: TopicWithMastery[],
@@ -539,7 +619,15 @@ export function selectActiveTopics(
     selected.length > 0 && selected.every((t) => tierInfo(t.mastery).key === 'dominado')
   if (allDominado && untouched.length > 0) selected = [...selected.slice(1), untouched[0]]
 
-  return selected
+  // Ressurgimento espaçado: tópicos dominados há muito tempo sem revisão voltam
+  // a disputar a hora da disciplina, mas apenas com uma fatia curta de manutenção.
+  const selectedIds = new Set(selected.map((t) => t.id))
+  const due = maintenanceDueTopics(topicsWithMastery)
+    .filter((t) => !selectedIds.has(t.id))
+    .slice(0, MAX_MAINTENANCE_SLOTS)
+    .map((t) => ({ ...t, maintenance: true }))
+
+  return [...selected, ...due]
 }
 
 // ============================== Revisão por cores ==============================

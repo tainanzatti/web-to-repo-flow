@@ -23,6 +23,8 @@ type Props = {
   activeDiscId: string
   onSelect?: (discId: string) => void
   size?: number
+  /** Quando true, apenas a disciplina ativa é clicável; as demais aparecem travadas. */
+  lockInactive?: boolean
 }
 
 function polar(cx: number, cy: number, r: number, deg: number) {
@@ -53,7 +55,13 @@ function sectorPath(
   ].join(' ')
 }
 
-export function StudyWheel({ lancamentos, activeDiscId, onSelect, size = 540 }: Props) {
+export function StudyWheel({
+  lancamentos,
+  activeDiscId,
+  onSelect,
+  size = 540,
+  lockInactive = false,
+}: Props) {
   const cx = size / 2
   const cy = size / 2
   const outerR = size / 2 - 42
@@ -92,20 +100,28 @@ export function StudyWheel({ lancamentos, activeDiscId, onSelect, size = 540 }: 
               ? 'color-mix(in srgb, var(--primary) 16%, var(--card-raised))'
               : 'var(--card-raised)'
 
+          const locked = lockInactive && !isActive
           const pctAcertos =
             agg.quantidade > 0 ? Math.round((agg.acertos / agg.quantidade) * 100) : null
           const tooltip = `${CURRICULUM[discId].name}\n${
             studied
               ? `${agg.quantidade} questões · ${pctAcertos}% acertos`
               : 'ainda sem lançamentos'
-          }`
+          }${locked ? '\n🔒 Travada — conclua ou pule a disciplina ativa' : ''}`
 
           return (
             <g
               key={discId}
-              className="wheel-sector cursor-pointer transition-[opacity,transform] duration-200"
-              onClick={() => onSelect?.(discId)}
-              style={{ opacity: isActive ? 1 : studied ? 0.96 : 0.82, transformOrigin: `${cx}px ${cy}px` }}
+              className={`wheel-sector transition-[opacity,transform] duration-200 ${
+                locked ? 'cursor-not-allowed' : 'cursor-pointer'
+              }`}
+              onClick={() => {
+                if (!locked) onSelect?.(discId)
+              }}
+              style={{
+                opacity: locked ? 0.45 : isActive ? 1 : studied ? 0.96 : 0.82,
+                transformOrigin: `${cx}px ${cy}px`,
+              }}
             >
               <title>{tooltip}</title>
               <path
@@ -173,6 +189,24 @@ export function StudyWheel({ lancamentos, activeDiscId, onSelect, size = 540 }: 
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
+              )}
+              {locked && (
+                <g className="pointer-events-none" opacity={0.9}>
+                  <rect
+                    x={tip.x - 2.6}
+                    y={tip.y - 0.6}
+                    width={5.2}
+                    height={4.2}
+                    rx={1}
+                    fill="var(--muted-foreground)"
+                  />
+                  <path
+                    d={`M ${tip.x - 1.5} ${tip.y - 0.8} v -1.1 a 1.5 1.5 0 0 1 3 0 v 1.1`}
+                    fill="none"
+                    stroke="var(--muted-foreground)"
+                    strokeWidth={0.9}
+                  />
+                </g>
               )}
             </g>
           )

@@ -15,12 +15,14 @@ import {
   X,
   LogOut,
   Loader2,
+  Timer,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
   CURRICULUM,
   ROTATION_ORDER,
   allocateMinutes,
+  nextHeroDiscipline,
   selectActiveTopics,
   disciplineTopicsWithMastery,
   maxTopicsForDiscipline,
@@ -49,6 +51,7 @@ import { RankingView } from '@/components/views/ranking-view'
 import { PerfilView } from '@/components/views/perfil-view'
 import { ConcluirModal } from '@/components/concluir-modal'
 import { MaterialModal } from '@/components/material-modal'
+import { FocusMode } from '@/components/focus-mode'
 import { IconTip } from '@/components/ui-bits'
 
 export const Route = createFileRoute('/')({
@@ -113,6 +116,7 @@ function OperacaoPMSC() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [material, setMaterial] = useState<{ discId: string; topicId: string } | null>(null)
   const [concluir, setConcluir] = useState<{ discId: string; topics: AllocatedTopic[] } | null>(null)
+  const [focus, setFocus] = useState<{ discId: string; topics: AllocatedTopic[] } | null>(null)
 
   // Exige login para acessar o app
   useEffect(() => {
@@ -148,6 +152,15 @@ function OperacaoPMSC() {
     },
     [lancamentos],
   )
+
+  const openFocus = useCallback(() => {
+    const discId = nextHeroDiscipline(lancamentos, skips)
+    const all = disciplineTopicsWithMastery(lancamentos, discId)
+    const active = selectActiveTopics(all, discId, lancamentos, maxTopicsForDiscipline(all))
+    setFocus({ discId, topics: allocateMinutes(active) })
+  }, [lancamentos, skips])
+
+
 
   const confirmConcluir = useCallback(
     async (entries: Omit<Lancamento, 'id'>[]) => {
@@ -317,11 +330,21 @@ function OperacaoPMSC() {
               {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
             </button>
           </IconTip>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="font-display text-lg font-bold text-foreground">{meta.title}</h1>
             <p className="text-[11px] text-muted-foreground">{meta.subtitle}</p>
           </div>
+          <IconTip label="Modo foco: cronômetro sem distrações" side="bottom">
+            <button
+              onClick={openFocus}
+              className="flex shrink-0 items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            >
+              <Timer size={14} />
+              <span className="hidden sm:inline">Modo foco</span>
+            </button>
+          </IconTip>
         </header>
+
 
         <main className="flex-1 px-4 py-6 sm:px-6">
           <div
@@ -360,7 +383,9 @@ function OperacaoPMSC() {
                 onOpenMaterial={openMaterial}
               />
             )}
-            {view === 'desempenho' && <DesempenhoView lancamentos={lancamentos} />}
+            {view === 'desempenho' && (
+              <DesempenhoView lancamentos={lancamentos} skips={skips} />
+            )}
             {view === 'lancamento' && (
               <LancamentoView
                 lancamentos={lancamentos}
@@ -374,6 +399,21 @@ function OperacaoPMSC() {
           </div>
         </main>
       </div>
+
+      {focus && (
+        <FocusMode
+          discId={focus.discId}
+          topics={focus.topics}
+          onClose={() => setFocus(null)}
+          onConcluir={() => {
+            const d = focus.discId
+            setFocus(null)
+            openConcluir(d)
+          }}
+        />
+      )}
+
+
 
       {material && (
         <MaterialModal

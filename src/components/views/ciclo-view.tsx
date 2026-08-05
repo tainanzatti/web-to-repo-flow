@@ -74,25 +74,115 @@ function StatCard({
   )
 }
 
+const MONTH_LABELS = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez']
+const WEEKS = 26
+
 function Heatmap({ lancamentos }: { lancamentos: Lancamento[] }) {
-  const days = 35
-  const studied = new Set(lancamentos.map((l) => l.data))
-  const cells = Array.from({ length: days }, (_, i) => {
-    const d = new Date(Date.now() - (days - 1 - i) * 86400000).toISOString().slice(0, 10)
-    return studied.has(d)
-  })
+  const { weeks, maxMin } = useMemo(() => {
+    const byDay = new Map<string, number>()
+    for (const l of lancamentos) {
+      byDay.set(l.data, (byDay.get(l.data) ?? 0) + (l.minutos || 0))
+    }
+    // termina na semana atual (domingo->sábado)
+    const today = new Date()
+    const end = new Date(today)
+    end.setDate(end.getDate() + (6 - end.getDay()))
+    const start = new Date(end)
+    start.setDate(start.getDate() - (WEEKS * 7 - 1))
+
+    const cols: { date: Date; iso: string; minutes: number; future: boolean }[][] = []
+    const todayIso = today.toISOString().slice(0, 10)
+    for (let w = 0; w < WEEKS; w++) {
+      const col = []
+      for (let d = 0; d < 7; d++) {
+        const date = new Date(start)
+        date.setDate(start.getDate() + w * 7 + d)
+        const iso = date.toISOString().slice(0, 10)
+        col.push({ date, iso, minutes: byDay.get(iso) ?? 0, future: iso > todayIso })
+      }
+      cols.push(col)
+    }
+    const maxMin = Math.max(60, ...Array.from(byDay.values()))
+    return { weeks: cols, maxMin }
+  }, [lancamentos])
+
+  const level = (min: number) => {
+    if (min <= 0) return 0
+    const r = min / maxMin
+    if (r <= 0.25) return 1
+    if (r <= 0.5) return 2
+    if (r <= 0.75) return 3
+    return 4
+  }
+  const bg = (lvl: number) =>
+    lvl === 0
+      ? 'var(--card-raised)'
+      : `color-mix(in srgb, var(--primary) ${lvl * 25}%, var(--card-raised))`
+
   return (
-    <div className="flex flex-wrap gap-1">
-      {cells.map((on, i) => (
-        <span
-          key={i}
-          className="h-3.5 w-3.5 rounded-[3px] transition-colors"
-          style={{
-            background: on ? 'var(--primary)' : 'var(--card-raised)',
-            boxShadow: on ? '0 0 6px color-mix(in srgb, var(--primary) 60%, transparent)' : 'none',
-          }}
-        />
-      ))}
+    <div className="overflow-x-auto pb-1">
+      <div className="inline-flex flex-col gap-1">
+        {/* rótulos de mês */}
+        <div className="flex gap-[3px] pl-6">
+          {weeks.map((col, i) => {
+            const first = col[0].date
+            const prev = i > 0 ? weeks[i - 1][0].date : null
+            const show = !prev || prev.getMonth() !== first.getMonth()
+            return (
+              <span
+                key={i}
+                className="w-[11px] font-mono text-[8px] text-faint"
+                style={{ overflow: 'visible', whiteSpace: 'nowrap' }}
+              >
+                {show ? MONTH_LABELS[first.getMonth()] : ''}
+              </span>
+            )
+          })}
+        </div>
+        <div className="flex gap-[3px]">
+          {/* rótulos de dia */}
+          <div className="mr-1 flex w-5 flex-col gap-[3px]">
+            {['', 'Seg', '', 'Qua', '', 'Sex', ''].map((d, i) => (
+              <span key={i} className="h-[11px] font-mono text-[8px] leading-[11px] text-faint">
+                {d}
+              </span>
+            ))}
+          </div>
+          {weeks.map((col, i) => (
+            <div key={i} className="flex flex-col gap-[3px]">
+              {col.map((cell) => (
+                <span
+                  key={cell.iso}
+                  title={
+                    cell.future
+                      ? ''
+                      : `${cell.iso} — ${cell.minutes > 0 ? `${cell.minutes} min` : 'sem estudo'}`
+                  }
+                  className="h-[11px] w-[11px] rounded-[2px]"
+                  style={{
+                    background: cell.future ? 'transparent' : bg(level(cell.minutes)),
+                    border: cell.future ? 'none' : '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
+                  }}
+                />
+              ))}
+            </div>
+          ))}
+        </div>
+        <div className="mt-1 flex items-center justify-end gap-1 pr-1">
+          <span className="font-mono text-[8px] text-faint">menos</span>
+          {[0, 1, 2, 3, 4].map((l) => (
+            <span
+              key={l}
+              className="h-[9px] w-[9px] rounded-[2px]"
+              style={{
+                background: bg(l),
+                border: '1px solid color-mix(in srgb, var(--border) 60%, transparent)',
+              }}
+            />
+          ))}
+          <span className="font-mono text-[8px] text-faint">mais</span>
+        </div>
+      </div>
     </div>
   )
 }
@@ -261,12 +351,12 @@ function CicloViewInner({ lancamentos, skips = {}, onOpenMaterial, onConcluir }:
           <SectionLabel icon={Target}>MAPA DO CICLO</SectionLabel>
           <StudyWheel
             lancamentos={lancamentos}
-            activeDiscId={selectedDiscId}
-            onSelect={setSelectedDiscId}
+            activeDiscId={heroDiscId}
+            lockInactive
           />
           <p className="mt-2 text-center text-[11px] text-faint">
-            Toque em uma disciplina para inspecionar a hora recomendada. O destaque em vermelho é o
-            próximo passo do ciclo.
+            Apenas a disciplina em destaque está liberada. As demais ficam travadas até você
+            concluir ou pular a atual no Núcleo.
           </p>
         </div>
 
