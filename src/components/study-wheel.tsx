@@ -55,7 +55,13 @@ function sectorPath(
   ].join(' ')
 }
 
-export function StudyWheel({ lancamentos, activeDiscId, onSelect, size = 540 }: Props) {
+export function StudyWheel({
+  lancamentos,
+  activeDiscId,
+  onSelect,
+  size = 540,
+  lockInactive = false,
+}: Props) {
   const cx = size / 2
   const cy = size / 2
   const outerR = size / 2 - 42
