@@ -168,11 +168,19 @@ function DesempenhoViewInner({ lancamentos, skips = {} }: Props) {
                     {w}d
                   </th>
                 ))}
+                <th className="pb-2 text-center font-medium">
+                  <span className="inline-flex items-center gap-1">
+                    <SkipForward size={11} /> Pulos
+                  </span>
+                </th>
               </tr>
             </thead>
             <tbody>
               {ROTATION_ORDER.map((id) => {
                 const agg = disciplineAggregate(lancamentos, id)
+                const skip = skips[id]
+                const skipCount = skip?.skipCount ?? 0
+                const streak = skip?.consecutiveSkips ?? 0
                 return (
                   <tr key={id} className="border-b border-border-soft/60 text-muted-foreground">
                     <td className="py-2.5 pr-4 font-medium text-foreground">{CURRICULUM[id].name}</td>
@@ -189,6 +197,27 @@ function DesempenhoViewInner({ lancamentos, skips = {} }: Props) {
                         <PctCell value={pctInWindow(lancamentos, id, w)} />
                       </td>
                     ))}
+                    <td className="py-2.5 text-center font-mono text-xs">
+                      {skipCount === 0 ? (
+                        <span className="text-faint">—</span>
+                      ) : (
+                        <span
+                          className="inline-flex items-center gap-1"
+                          title={
+                            streak > 0
+                              ? `${streak} pulo(s) seguidos — urgência aumentada`
+                              : 'Sem sequência ativa de pulos'
+                          }
+                        >
+                          <span style={{ color: 'var(--primary)' }}>{skipCount}×</span>
+                          {streak > 0 && (
+                            <span className="rounded-sm bg-primary/15 px-1 text-[9px] text-primary">
+                              {streak} seg.
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </td>
                   </tr>
                 )
               })}
