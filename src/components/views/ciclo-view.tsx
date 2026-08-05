@@ -261,12 +261,12 @@ function CicloViewInner({ lancamentos, skips = {}, onOpenMaterial, onConcluir }:
           <SectionLabel icon={Target}>MAPA DO CICLO</SectionLabel>
           <StudyWheel
             lancamentos={lancamentos}
-            activeDiscId={selectedDiscId}
-            onSelect={setSelectedDiscId}
+            activeDiscId={heroDiscId}
+            lockInactive
           />
           <p className="mt-2 text-center text-[11px] text-faint">
-            Toque em uma disciplina para inspecionar a hora recomendada. O destaque em vermelho é o
-            próximo passo do ciclo.
+            Apenas a disciplina em destaque está liberada. As demais ficam travadas até você
+            concluir ou pular a atual no Núcleo.
           </p>
         </div>
 
