@@ -12,11 +12,17 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts'
-import { ClipboardCheck, CheckCircle2, XCircle, Gauge, Zap, TrendingUp } from 'lucide-react'
-import { CURRICULUM, ROTATION_ORDER, disciplineAggregate, type Lancamento } from '@/lib/curriculum'
+import { ClipboardCheck, CheckCircle2, XCircle, Gauge, Zap, TrendingUp, SkipForward } from 'lucide-react'
+import {
+  CURRICULUM,
+  ROTATION_ORDER,
+  disciplineAggregate,
+  type DisciplineSkips,
+  type Lancamento,
+} from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
 
-type Props = { lancamentos: Lancamento[] }
+type Props = { lancamentos: Lancamento[]; skips?: DisciplineSkips }
 
 const TIME_WINDOWS = [90, 60, 30, 15, 7]
 
