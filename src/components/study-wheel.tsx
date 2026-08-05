@@ -100,20 +100,28 @@ export function StudyWheel({
               ? 'color-mix(in srgb, var(--primary) 16%, var(--card-raised))'
               : 'var(--card-raised)'
 
+          const locked = lockInactive && !isActive
           const pctAcertos =
             agg.quantidade > 0 ? Math.round((agg.acertos / agg.quantidade) * 100) : null
           const tooltip = `${CURRICULUM[discId].name}\n${
             studied
               ? `${agg.quantidade} questões · ${pctAcertos}% acertos`
               : 'ainda sem lançamentos'
-          }`
+          }${locked ? '\n🔒 Travada — conclua ou pule a disciplina ativa' : ''}`
 
           return (
             <g
               key={discId}
-              className="wheel-sector cursor-pointer transition-[opacity,transform] duration-200"
-              onClick={() => onSelect?.(discId)}
-              style={{ opacity: isActive ? 1 : studied ? 0.96 : 0.82, transformOrigin: `${cx}px ${cy}px` }}
+              className={`wheel-sector transition-[opacity,transform] duration-200 ${
+                locked ? 'cursor-not-allowed' : 'cursor-pointer'
+              }`}
+              onClick={() => {
+                if (!locked) onSelect?.(discId)
+              }}
+              style={{
+                opacity: locked ? 0.45 : isActive ? 1 : studied ? 0.96 : 0.82,
+                transformOrigin: `${cx}px ${cy}px`,
+              }}
             >
               <title>{tooltip}</title>
               <path
