@@ -51,6 +51,7 @@ import { RankingView } from '@/components/views/ranking-view'
 import { PerfilView } from '@/components/views/perfil-view'
 import { ConcluirModal } from '@/components/concluir-modal'
 import { MaterialModal } from '@/components/material-modal'
+import { FocusMode } from '@/components/focus-mode'
 import { IconTip } from '@/components/ui-bits'
 
 export const Route = createFileRoute('/')({
