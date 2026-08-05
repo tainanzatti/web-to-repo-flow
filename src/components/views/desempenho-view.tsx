@@ -12,11 +12,24 @@ import {
   Tooltip,
   CartesianGrid,
 } from 'recharts'
-import { ClipboardCheck, CheckCircle2, XCircle, Gauge, Zap, TrendingUp, SkipForward } from 'lucide-react'
+import {
+  ClipboardCheck,
+  CheckCircle2,
+  XCircle,
+  Gauge,
+  Zap,
+  TrendingUp,
+  SkipForward,
+  ListTree,
+  ChevronRight,
+} from 'lucide-react'
 import {
   CURRICULUM,
   ROTATION_ORDER,
+  MAINTENANCE_DUE_DAYS,
   disciplineAggregate,
+  disciplineTopicsWithMastery,
+  tierInfo,
   type DisciplineSkips,
   type Lancamento,
 } from '@/lib/curriculum'
