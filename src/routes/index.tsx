@@ -149,6 +149,15 @@ function OperacaoPMSC() {
     [lancamentos],
   )
 
+  const openFocus = useCallback(() => {
+    const discId = nextHeroDiscipline(lancamentos, skips)
+    const all = disciplineTopicsWithMastery(lancamentos, discId)
+    const active = selectActiveTopics(all, discId, lancamentos, maxTopicsForDiscipline(all))
+    setFocus({ discId, topics: allocateMinutes(active) })
+  }, [lancamentos, skips])
+
+
+
   const confirmConcluir = useCallback(
     async (entries: Omit<Lancamento, 'id'>[]) => {
       if (!user) return
