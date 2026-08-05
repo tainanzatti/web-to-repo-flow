@@ -360,7 +360,9 @@ function OperacaoPMSC() {
                 onOpenMaterial={openMaterial}
               />
             )}
-            {view === 'desempenho' && <DesempenhoView lancamentos={lancamentos} />}
+            {view === 'desempenho' && (
+              <DesempenhoView lancamentos={lancamentos} skips={skips} />
+            )}
             {view === 'lancamento' && (
               <LancamentoView
                 lancamentos={lancamentos}
