@@ -34,7 +34,7 @@ function pctInWindow(lancamentos: Lancamento[], discId: string, days: number): n
   return q > 0 ? Math.round((a / q) * 100) : null
 }
 
-function DesempenhoViewInner({ lancamentos }: Props) {
+function DesempenhoViewInner({ lancamentos, skips = {} }: Props) {
   const totalQ = lancamentos.reduce((a, e) => a + e.quantidade, 0)
   const totalA = lancamentos.reduce((a, e) => a + e.acertos, 0)
   const totalMin = lancamentos.reduce((a, e) => a + (e.minutos || 0), 0)
