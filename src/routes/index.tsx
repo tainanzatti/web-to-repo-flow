@@ -328,11 +328,21 @@ function OperacaoPMSC() {
               {mobileNavOpen ? <X size={16} /> : <Menu size={16} />}
             </button>
           </IconTip>
-          <div>
+          <div className="min-w-0 flex-1">
             <h1 className="font-display text-lg font-bold text-foreground">{meta.title}</h1>
             <p className="text-[11px] text-muted-foreground">{meta.subtitle}</p>
           </div>
+          <IconTip label="Modo foco: cronômetro sem distrações" side="bottom">
+            <button
+              onClick={openFocus}
+              className="flex shrink-0 items-center gap-2 rounded-lg border border-border px-3 py-2 text-[12px] font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            >
+              <Timer size={14} />
+              <span className="hidden sm:inline">Modo foco</span>
+            </button>
+          </IconTip>
         </header>
+
 
         <main className="flex-1 px-4 py-6 sm:px-6">
           <div
