@@ -21,6 +21,7 @@ import {
   CURRICULUM,
   ROTATION_ORDER,
   allocateMinutes,
+  nextHeroDiscipline,
   selectActiveTopics,
   disciplineTopicsWithMastery,
   maxTopicsForDiscipline,
