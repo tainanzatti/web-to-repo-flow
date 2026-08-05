@@ -324,6 +324,23 @@ export function allocateMinutes(activeTopics: TopicWithMastery[]): AllocatedTopi
   return activeTopics.map((t, i) => ({ ...t, minutes: result[i] }))
 }
 
+// Dias desde a última revisão de um tópico específico (null = nunca revisado).
+export function daysSinceTopicReview(
+  lancamentos: Lancamento[],
+  discId: string,
+  topicId: string
+): number | null {
+  const entries = lancamentos
+    .filter((l) => l.disciplinaId === discId && l.topicoId === topicId)
+    .map((l) => l.data)
+    .sort()
+  if (entries.length === 0) return null
+  const today = new Date().toISOString().slice(0, 10)
+  return Math.round(
+    (new Date(today).getTime() - new Date(entries[entries.length - 1]).getTime()) / 86400000
+  )
+}
+
 export function disciplineTopicsWithMastery(
   lancamentos: Lancamento[],
   discId: string
@@ -331,6 +348,7 @@ export function disciplineTopicsWithMastery(
   return CURRICULUM[discId].topics.map((t) => ({
     ...t,
     mastery: movingAverageMastery(lancamentos, discId, t.id),
+    daysSinceReview: daysSinceTopicReview(lancamentos, discId, t.id),
   }))
 }
 
