@@ -23,6 +23,8 @@ type Props = {
   activeDiscId: string
   onSelect?: (discId: string) => void
   size?: number
+  /** Quando true, apenas a disciplina ativa é clicável; as demais aparecem travadas. */
+  lockInactive?: boolean
 }
 
 function polar(cx: number, cy: number, r: number, deg: number) {
