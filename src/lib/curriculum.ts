@@ -568,6 +568,25 @@ const TIER_ORDER: Record<TierKey, number> = {
   dominado: 4,
 }
 
+// Janela de manutenção: tópico dominado sem revisão há mais de N dias volta à fila.
+export const MAINTENANCE_DUE_DAYS = 21
+// Nº máximo de tópicos de manutenção que podem ressurgir por sessão.
+const MAX_MAINTENANCE_SLOTS = 2
+
+// Tópicos dominados que já passaram da janela de manutenção, do mais esquecido para o menos.
+export function maintenanceDueTopics(
+  topicsWithMastery: TopicWithMastery[]
+): TopicWithMastery[] {
+  return topicsWithMastery
+    .filter(
+      (t) =>
+        tierInfo(t.mastery).key === 'dominado' &&
+        typeof t.daysSinceReview === 'number' &&
+        t.daysSinceReview >= MAINTENANCE_DUE_DAYS
+    )
+    .sort((a, b) => (b.daysSinceReview ?? 0) - (a.daysSinceReview ?? 0))
+}
+
 // Seleciona quais tópicos disputam a hora desta disciplina no ciclo atual.
 export function selectActiveTopics(
   topicsWithMastery: TopicWithMastery[],
@@ -598,7 +617,15 @@ export function selectActiveTopics(
     selected.length > 0 && selected.every((t) => tierInfo(t.mastery).key === 'dominado')
   if (allDominado && untouched.length > 0) selected = [...selected.slice(1), untouched[0]]
 
-  return selected
+  // Ressurgimento espaçado: tópicos dominados há muito tempo sem revisão voltam
+  // a disputar a hora da disciplina, mas apenas com uma fatia curta de manutenção.
+  const selectedIds = new Set(selected.map((t) => t.id))
+  const due = maintenanceDueTopics(topicsWithMastery)
+    .filter((t) => !selectedIds.has(t.id))
+    .slice(0, MAX_MAINTENANCE_SLOTS)
+    .map((t) => ({ ...t, maintenance: true }))
+
+  return [...selected, ...due]
 }
 
 // ============================== Revisão por cores ==============================
