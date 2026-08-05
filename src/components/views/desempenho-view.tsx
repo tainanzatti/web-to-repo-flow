@@ -225,6 +225,114 @@ function DesempenhoViewInner({ lancamentos, skips = {} }: Props) {
           </table>
         </div>
       </div>
+
+      <TopicBreakdown lancamentos={lancamentos} />
+    </div>
+  )
+}
+
+function TopicBreakdown({ lancamentos }: { lancamentos: Lancamento[] }) {
+  const [open, setOpen] = useState<string | null>(ROTATION_ORDER[0])
+
+  return (
+    <div className="rounded-2xl border border-border-soft bg-card p-5">
+      <SectionLabel icon={ListTree}>DESEMPENHO POR TÓPICO</SectionLabel>
+      <div className="space-y-2">
+        {ROTATION_ORDER.map((discId) => {
+          const isOpen = open === discId
+          const topics = disciplineTopicsWithMastery(lancamentos, discId)
+          const agg = disciplineAggregate(lancamentos, discId)
+          return (
+            <div key={discId} className="overflow-hidden rounded-xl border border-border-soft">
+              <button
+                onClick={() => setOpen(isOpen ? null : discId)}
+                className="flex w-full items-center gap-3 bg-card-raised px-3 py-2.5 text-left transition hover:brightness-110"
+              >
+                <ChevronRight
+                  size={14}
+                  className={`shrink-0 text-faint transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                />
+                <span className="flex-1 truncate text-[13px] font-semibold text-foreground">
+                  {CURRICULUM[discId].name}
+                </span>
+                <span className="shrink-0 font-mono text-[10px] text-faint">
+                  {topics.filter((t) => t.mastery !== null).length}/{topics.length} tópicos
+                </span>
+                <span className="w-10 shrink-0 text-right font-mono text-[11px] font-semibold">
+                  <PctCell value={agg.pct} />
+                </span>
+              </button>
+
+              {isOpen && (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-border-soft text-left font-mono text-[9px] uppercase tracking-wider text-faint">
+                        <th className="px-3 py-2 font-medium">Tópico</th>
+                        <th className="px-2 py-2 text-center font-medium">Peso</th>
+                        <th className="px-2 py-2 text-center font-medium">Questões</th>
+                        <th className="px-2 py-2 text-center font-medium">Acertos</th>
+                        <th className="px-2 py-2 text-center font-medium">Domínio</th>
+                        <th className="px-2 py-2 text-center font-medium">Nível</th>
+                        <th className="px-3 py-2 text-center font-medium">Últ. revisão</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {topics.map((t) => {
+                        const entries = lancamentos.filter(
+                          (l) => l.disciplinaId === discId && l.topicoId === t.id,
+                        )
+                        const q = entries.reduce((a, e) => a + e.quantidade, 0)
+                        const a = entries.reduce((s, e) => s + e.acertos, 0)
+                        const tier = tierInfo(t.mastery)
+                        const overdue =
+                          tier.key === 'dominado' &&
+                          typeof t.daysSinceReview === 'number' &&
+                          t.daysSinceReview >= MAINTENANCE_DUE_DAYS
+                        return (
+                          <tr
+                            key={t.id}
+                            className="border-b border-border-soft/50 text-muted-foreground last:border-0"
+                          >
+                            <td className="px-3 py-2 text-[12px] text-foreground">{t.name}</td>
+                            <td className="px-2 py-2 text-center font-mono text-[11px]">{t.fib}</td>
+                            <td className="px-2 py-2 text-center font-mono text-[11px]">{q}</td>
+                            <td className="px-2 py-2 text-center font-mono text-[11px]">{a}</td>
+                            <td className="px-2 py-2 text-center font-mono text-[11px] font-semibold">
+                              <PctCell value={t.mastery} />
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              <span
+                                className="rounded-sm px-1.5 py-0.5 font-mono text-[9px]"
+                                style={{
+                                  color: tier.token,
+                                  background: `color-mix(in srgb, ${tier.token} 14%, transparent)`,
+                                }}
+                              >
+                                {tier.label}
+                              </span>
+                            </td>
+                            <td className="px-3 py-2 text-center font-mono text-[11px]">
+                              {t.daysSinceReview === null || t.daysSinceReview === undefined ? (
+                                <span className="text-faint">nunca</span>
+                              ) : (
+                                <span style={overdue ? { color: 'var(--primary)' } : undefined}>
+                                  {t.daysSinceReview === 0 ? 'hoje' : `${t.daysSinceReview}d`}
+                                  {overdue ? ' ⟳' : ''}
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
     </div>
   )
 }
