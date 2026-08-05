@@ -113,6 +113,7 @@ function OperacaoPMSC() {
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [material, setMaterial] = useState<{ discId: string; topicId: string } | null>(null)
   const [concluir, setConcluir] = useState<{ discId: string; topics: AllocatedTopic[] } | null>(null)
+  const [focus, setFocus] = useState<{ discId: string; topics: AllocatedTopic[] } | null>(null)
 
   // Exige login para acessar o app
   useEffect(() => {
