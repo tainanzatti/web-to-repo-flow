@@ -231,6 +231,8 @@ export function tierInfo(mastery: number | null | undefined): TierInfo {
 
 export function explainAllocation(t: TopicWithMastery): string {
   const tier = tierInfo(t.mastery)
+  if (t.maintenance)
+    return `Dominado, mas sem revisão há ${t.daysSinceReview} dias — teste curto de manutenção.`
   if (tier.key === 'sem-dados') return `Ainda sem lançamentos — prioridade máxima (peso ${t.fib}).`
   if (tier.key === 'fraco') return `Média abaixo de 50% — mantém prioridade alta.`
   if (tier.key === 'mediano') return `Entre 50–75% — tempo reduzido, em consolidação.`
