@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordPage() {
   const navigate = useNavigate();
   const { resetPassword } = useAuth();
   const [isLoading, setIsLoading] = useState(false);

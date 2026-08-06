@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
-export default function SignupPage() {
+function SignupPage() {
   const navigate = useNavigate();
   const { signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
