@@ -120,5 +120,14 @@ export default function LoginPage() {
 }
 
 export const Route = createFileRoute('/login')({
+  head: () => ({
+    meta: [
+      { title: 'Entrar — Operação PMSC' },
+      { name: 'description', content: 'Acesse sua conta da Operação PMSC e continue seu ciclo de estudos para Soldado PMSC 2026.' },
+      { property: 'og:title', content: 'Entrar — Operação PMSC' },
+      { property: 'og:description', content: 'Acesse sua conta da Operação PMSC e continue seu ciclo de estudos para Soldado PMSC 2026.' },
+    ],
+  }),
   component: LoginPage,
 })
+
