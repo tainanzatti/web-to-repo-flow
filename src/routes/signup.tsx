@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
-export default function SignupPage() {
+function SignupPage() {
   const navigate = useNavigate();
   const { signUp } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -182,5 +182,14 @@ export default function SignupPage() {
 }
 
 export const Route = createFileRoute('/signup')({
+  head: () => ({
+    meta: [
+      { title: 'Criar conta — Operação PMSC' },
+      { name: 'description', content: 'Crie sua conta gratuita e comece o ciclo de estudos guiado para o concurso Soldado PMSC 2026.' },
+      { property: 'og:title', content: 'Criar conta — Operação PMSC' },
+      { property: 'og:description', content: 'Crie sua conta gratuita e comece o ciclo de estudos guiado para o concurso Soldado PMSC 2026.' },
+    ],
+  }),
   component: SignupPage,
 })
+

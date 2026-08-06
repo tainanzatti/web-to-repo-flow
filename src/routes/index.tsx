@@ -55,8 +55,35 @@ import { FocusMode } from '@/components/focus-mode'
 import { IconTip } from '@/components/ui-bits'
 
 export const Route = createFileRoute('/')({
+  head: () => ({
+    meta: [
+      { title: 'Painel de Estudos — Operação PMSC Soldado 2026' },
+      {
+        name: 'description',
+        content:
+          'Painel do candidato: ciclo de estudos ponderado pelo edital, desempenho por tópico, materiais de IA e ranking para a PMSC 2026.',
+      },
+      { property: 'og:title', content: 'Painel de Estudos — Operação PMSC Soldado 2026' },
+      {
+        property: 'og:description',
+        content:
+          'Painel do candidato: ciclo de estudos ponderado pelo edital, desempenho por tópico, materiais de IA e ranking para a PMSC 2026.',
+      },
+      {
+        property: 'og:image',
+        content:
+          'https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/df3b997f-03c2-4b72-99ad-0bd5212b559d/id-preview-0ea92b26--abca5d6e-5074-4361-b3f8-788d45b1878d.lovable.app-1783707883430.png',
+      },
+      {
+        name: 'twitter:image',
+        content:
+          'https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/df3b997f-03c2-4b72-99ad-0bd5212b559d/id-preview-0ea92b26--abca5d6e-5074-4361-b3f8-788d45b1878d.lovable.app-1783707883430.png',
+      },
+    ],
+  }),
   component: OperacaoPMSC,
 })
+
 
 type ViewId =
   | 'painel'

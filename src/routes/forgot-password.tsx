@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 
-export default function ForgotPasswordPage() {
+function ForgotPasswordPage() {
   const navigate = useNavigate();
   const { resetPassword } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
@@ -124,5 +124,14 @@ export default function ForgotPasswordPage() {
 }
 
 export const Route = createFileRoute('/forgot-password')({
+  head: () => ({
+    meta: [
+      { title: 'Recuperar senha — Operação PMSC' },
+      { name: 'description', content: 'Recupere o acesso à sua conta da Operação PMSC e volte aos estudos para a PMSC 2026.' },
+      { property: 'og:title', content: 'Recuperar senha — Operação PMSC' },
+      { property: 'og:description', content: 'Recupere o acesso à sua conta da Operação PMSC e volte aos estudos para a PMSC 2026.' },
+    ],
+  }),
   component: ForgotPasswordPage,
 })
+

@@ -91,8 +91,6 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:card", content: "summary" },
       { name: "twitter:title", content: "Operação PMSC — Plataforma de Estudos" },
       { name: "twitter:description", content: "Plataforma de estudos para o concurso da PMSC: ciclo de estudos, questões, materiais de IA e progresso salvo na nuvem." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/df3b997f-03c2-4b72-99ad-0bd5212b559d/id-preview-0ea92b26--abca5d6e-5074-4361-b3f8-788d45b1878d.lovable.app-1783707883430.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/df3b997f-03c2-4b72-99ad-0bd5212b559d/id-preview-0ea92b26--abca5d6e-5074-4361-b3f8-788d45b1878d.lovable.app-1783707883430.png" },
     ],
     links: [
       {
