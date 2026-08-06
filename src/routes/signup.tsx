@@ -182,5 +182,14 @@ export default function SignupPage() {
 }
 
 export const Route = createFileRoute('/signup')({
+  head: () => ({
+    meta: [
+      { title: 'Criar conta — Operação PMSC' },
+      { name: 'description', content: 'Crie sua conta gratuita e comece o ciclo de estudos guiado para o concurso Soldado PMSC 2026.' },
+      { property: 'og:title', content: 'Criar conta — Operação PMSC' },
+      { property: 'og:description', content: 'Crie sua conta gratuita e comece o ciclo de estudos guiado para o concurso Soldado PMSC 2026.' },
+    ],
+  }),
   component: SignupPage,
 })
+
