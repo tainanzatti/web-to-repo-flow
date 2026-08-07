@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AuthShell, FieldError } from '@/components/auth-shell';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
@@ -22,29 +22,16 @@ function SignupPage() {
     register,
     handleSubmit,
     formState: { errors },
-    watch,
   } = useForm<SignupFormData>({
     resolver: zodResolver(signupSchema),
   });
-
-  const password = watch('password');
 
   const onSubmit = async (data: SignupFormData) => {
     try {
       setIsLoading(true);
       setError(null);
 
-      if (data.password !== data.confirmPassword) {
-        throw new Error('Senhas não correspondem');
-      }
-
-      await signUp(
-        data.email,
-        data.password,
-        data.fullName,
-        data.dateOfBirth,
-        data.cpf
-      );
+      await signUp(data.email, data.password, data.fullName, data.dateOfBirth, data.cpf);
 
       toast.success('Cadastro realizado com sucesso!');
       navigate({ to: '/' });
@@ -58,126 +45,121 @@ function SignupPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Criar Conta</CardTitle>
-          <CardDescription>Preencha os dados para se cadastrar</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+    <AuthShell
+      title="Criar conta"
+      subtitle="Preencha os dados para começar a operação."
+      footer={
+        <span className="text-muted-foreground">
+          Já tem uma conta?{' '}
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/login' })}
+            className="font-medium text-primary transition hover:brightness-125"
+          >
+            Faça login
+          </button>
+        </span>
+      }
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-            <div className="space-y-2">
-              <Label htmlFor="fullName">Nome Completo</Label>
-              <Input
-                id="fullName"
-                type="text"
-                placeholder="João da Silva"
-                {...register('fullName')}
-                disabled={isLoading}
-              />
-              {errors.fullName && (
-                <p className="text-sm text-red-500">{errors.fullName.message}</p>
-              )}
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="fullName">Nome completo</Label>
+          <Input
+            id="fullName"
+            type="text"
+            autoComplete="name"
+            placeholder="João da Silva"
+            aria-invalid={!!errors.fullName}
+            {...register('fullName')}
+            disabled={isLoading}
+          />
+          <FieldError message={errors.fullName?.message} />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="dateOfBirth">Data de Nascimento</Label>
-              <Input
-                id="dateOfBirth"
-                type="date"
-                {...register('dateOfBirth')}
-                disabled={isLoading}
-              />
-              {errors.dateOfBirth && (
-                <p className="text-sm text-red-500">{errors.dateOfBirth.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="cpf">CPF</Label>
-              <Input
-                id="cpf"
-                type="text"
-                placeholder="000.000.000-00"
-                {...register('cpf')}
-                disabled={isLoading}
-              />
-              {errors.cpf && (
-                <p className="text-sm text-red-500">{errors.cpf.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                {...register('email')}
-                disabled={isLoading}
-              />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                {...register('password')}
-                disabled={isLoading}
-              />
-              {errors.password && (
-                <p className="text-sm text-red-500">{errors.password.message}</p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmar Senha</Label>
-              <Input
-                id="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                {...register('confirmPassword')}
-                disabled={isLoading}
-              />
-              {errors.confirmPassword && (
-                <p className="text-sm text-red-500">{errors.confirmPassword.message}</p>
-              )}
-            </div>
-
-            <Button
-              type="submit"
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="dateOfBirth">Data de nascimento</Label>
+            <Input
+              id="dateOfBirth"
+              type="date"
               className="w-full"
+              aria-invalid={!!errors.dateOfBirth}
+              {...register('dateOfBirth')}
               disabled={isLoading}
-            >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? 'Cadastrando...' : 'Cadastrar'}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-sm text-center text-gray-600">
-            Já tem uma conta?{' '}
-            <button
-              onClick={() => navigate({ to: '/login' })}
-              className="text-blue-600 hover:underline font-medium"
-            >
-              Faça login
-            </button>
+            />
+            <FieldError message={errors.dateOfBirth?.message} />
           </div>
-        </CardContent>
-      </Card>
-    </div>
+
+          <div className="min-w-0 space-y-2">
+            <Label htmlFor="cpf">CPF</Label>
+            <Input
+              id="cpf"
+              type="text"
+              inputMode="numeric"
+              placeholder="000.000.000-00"
+              aria-invalid={!!errors.cpf}
+              {...register('cpf')}
+              disabled={isLoading}
+            />
+            <FieldError message={errors.cpf?.message} />
+          </div>
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="seu@email.com"
+            aria-invalid={!!errors.email}
+            {...register('email')}
+            disabled={isLoading}
+          />
+          <FieldError message={errors.email?.message} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="password">Senha</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="new-password"
+            placeholder="••••••••"
+            aria-invalid={!!errors.password}
+            {...register('password')}
+            disabled={isLoading}
+          />
+          <FieldError message={errors.password?.message} />
+        </div>
+
+        <div className="space-y-2">
+          <Label htmlFor="confirmPassword">Confirmar senha</Label>
+          <Input
+            id="confirmPassword"
+            type="password"
+            autoComplete="new-password"
+            placeholder="••••••••"
+            aria-invalid={!!errors.confirmPassword}
+            {...register('confirmPassword')}
+            disabled={isLoading}
+          />
+          <FieldError message={errors.confirmPassword?.message} />
+        </div>
+
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoading ? 'Cadastrando...' : 'Cadastrar'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -192,4 +174,3 @@ export const Route = createFileRoute('/signup')({
   }),
   component: SignupPage,
 })
-
