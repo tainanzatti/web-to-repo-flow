@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AuthShell, FieldError } from '@/components/auth-shell';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 
@@ -45,81 +45,63 @@ function ForgotPasswordPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-        <Card className="w-full max-w-md">
-          <CardContent className="pt-6">
-            <div className="text-center space-y-4">
-              <CheckCircle2 className="h-12 w-12 text-green-600 mx-auto" />
-              <h2 className="text-2xl font-bold">Email Enviado!</h2>
-              <p className="text-gray-600">
-                Verifique seu email para as instruções de recuperação de senha.
-              </p>
-              <Button
-                onClick={() => navigate({ to: '/login' })}
-                className="w-full mt-4"
-              >
-                Voltar ao Login
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <AuthShell title="Email enviado" subtitle="Confira sua caixa de entrada.">
+        <div className="space-y-4 text-center">
+          <CheckCircle2 className="mx-auto h-10 w-10 text-success" />
+          <p className="text-[13px] text-muted-foreground">
+            Enviamos as instruções de recuperação de senha para o seu email. O link expira em
+            pouco tempo — use assim que receber.
+          </p>
+          <Button onClick={() => navigate({ to: '/login' })} className="w-full">
+            Voltar ao login
+          </Button>
+        </div>
+      </AuthShell>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Recuperar Senha</CardTitle>
-          <CardDescription>
-            Digite seu email para receber instruções de recuperação
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+    <AuthShell
+      title="Recuperar senha"
+      subtitle="Digite seu email para receber as instruções."
+      footer={
+        <button
+          type="button"
+          onClick={() => navigate({ to: '/login' })}
+          className="text-muted-foreground transition hover:text-primary"
+        >
+          Voltar ao login
+        </button>
+      }
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                {...register('email')}
-                disabled={isLoading}
-              />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
-              )}
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="seu@email.com"
+            aria-invalid={!!errors.email}
+            {...register('email')}
+            disabled={isLoading}
+          />
+          <FieldError message={errors.email?.message} />
+        </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? 'Enviando...' : 'Enviar Email de Recuperação'}
-            </Button>
-          </form>
-
-          <div className="mt-4 text-center">
-            <button
-              onClick={() => navigate({ to: '/login' })}
-              className="text-blue-600 hover:underline text-sm"
-            >
-              Voltar ao Login
-            </button>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoading ? 'Enviando...' : 'Enviar email de recuperação'}
+        </Button>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -134,4 +116,3 @@ export const Route = createFileRoute('/forgot-password')({
   }),
   component: ForgotPasswordPage,
 })
-
