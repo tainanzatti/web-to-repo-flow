@@ -7,8 +7,8 @@ import { useAuth } from '@/lib/auth-context';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AuthShell, FieldError } from '@/components/auth-shell';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2 } from 'lucide-react';
 
@@ -43,79 +43,74 @@ function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold">Bem-vindo</CardTitle>
-          <CardDescription>Faça login para acessar sua conta</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
+    <AuthShell
+      title="Bem-vindo de volta"
+      subtitle="Entre para continuar seu ciclo de estudos."
+      footer={
+        <span className="text-muted-foreground">
+          Não tem uma conta?{' '}
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/signup' })}
+            className="font-medium text-primary transition hover:brightness-125"
+          >
+            Cadastre-se
+          </button>
+        </span>
+      }
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                {...register('email')}
-                disabled={isLoading}
-              />
-              {errors.email && (
-                <p className="text-sm text-red-500">{errors.email.message}</p>
-              )}
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="email">Email</Label>
+          <Input
+            id="email"
+            type="email"
+            autoComplete="email"
+            placeholder="seu@email.com"
+            aria-invalid={!!errors.email}
+            {...register('email')}
+            disabled={isLoading}
+          />
+          <FieldError message={errors.email?.message} />
+        </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••••"
-                {...register('password')}
-                disabled={isLoading}
-              />
-              {errors.password && (
-                <p className="text-sm text-red-500">{errors.password.message}</p>
-              )}
-            </div>
+        <div className="space-y-2">
+          <Label htmlFor="password">Senha</Label>
+          <Input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="••••••••"
+            aria-invalid={!!errors.password}
+            {...register('password')}
+            disabled={isLoading}
+          />
+          <FieldError message={errors.password?.message} />
+        </div>
 
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLoading ? 'Entrando...' : 'Entrar'}
-            </Button>
-          </form>
+        <Button type="submit" className="w-full" disabled={isLoading}>
+          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          {isLoading ? 'Entrando...' : 'Entrar'}
+        </Button>
 
-          <div className="mt-4 space-y-2 text-sm text-center">
-            <button
-              onClick={() => navigate({ to: '/forgot-password' })}
-              className="text-blue-600 hover:underline"
-            >
-              Esqueci minha senha
-            </button>
-            <div className="text-gray-600">
-              Não tem uma conta?{' '}
-              <button
-                onClick={() => navigate({ to: '/signup' })}
-                className="text-blue-600 hover:underline font-medium"
-              >
-                Cadastre-se
-              </button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => navigate({ to: '/forgot-password' })}
+            className="text-[12px] text-muted-foreground transition hover:text-primary"
+          >
+            Esqueci minha senha
+          </button>
+        </div>
+      </form>
+    </AuthShell>
   );
 }
 
@@ -130,4 +125,3 @@ export const Route = createFileRoute('/login')({
   }),
   component: LoginPage,
 })
-
