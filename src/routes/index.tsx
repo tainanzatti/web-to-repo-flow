@@ -157,14 +157,19 @@ function OperacaoPMSC() {
     if (!user) return
     let cancelled = false
     setDataLoading(true)
-    Promise.all([fetchLancamentos(user.id), fetchDisciplineSkips(user.id)]).then(
-      ([rows, skipRows]) => {
+    Promise.all([fetchLancamentos(user.id), fetchDisciplineSkips(user.id)])
+      .then(([rows, skipRows]) => {
         if (cancelled) return
         setLancamentos(rows)
         setSkips(skipRows)
-        setDataLoading(false)
-      },
-    )
+      })
+      .catch((err) => {
+        console.error('Erro ao carregar dados do usuário:', err)
+        if (!cancelled) toast.error('Não foi possível carregar seus dados. Recarregue a página.')
+      })
+      .finally(() => {
+        if (!cancelled) setDataLoading(false)
+      })
     return () => {
       cancelled = true
     }
@@ -187,23 +192,27 @@ function OperacaoPMSC() {
     setFocus({ discId, topics: allocateMinutes(active) })
   }, [lancamentos, skips])
 
-
-
   const confirmConcluir = useCallback(
     async (entries: Omit<Lancamento, 'id'>[]) => {
       if (!user) return
-      const saved = await insertLancamentos(user.id, entries)
-      setLancamentos((prev) => [...prev, ...saved])
-      // Concluir a disciplina zera a urgência acumulada por pulos.
-      const discIds = [...new Set(saved.map((s) => s.disciplinaId))]
-      await Promise.all(discIds.map((d) => clearDisciplineSkipStreak(user.id, d)))
-      setSkips((prev) => {
-        const next = { ...prev }
-        for (const d of discIds) if (next[d]) next[d] = { ...next[d], consecutiveSkips: 0 }
-        return next
-      })
-      setConcluir(null)
-      setView('ciclo')
+      try {
+        const saved = await insertLancamentos(user.id, entries)
+        setLancamentos((prev) => [...prev, ...saved])
+        // Concluir a disciplina zera a urgência acumulada por pulos.
+        const discIds = [...new Set(saved.map((s) => s.disciplinaId))]
+        await Promise.all(discIds.map((d) => clearDisciplineSkipStreak(user.id, d)))
+        setSkips((prev) => {
+          const next = { ...prev }
+          for (const d of discIds) if (next[d]) next[d] = { ...next[d], consecutiveSkips: 0 }
+          return next
+        })
+        setConcluir(null)
+        setView('ciclo')
+        toast.success('Sessão registrada com sucesso!')
+      } catch (err) {
+        console.error('Erro ao concluir sessão:', err)
+        toast.error('Não foi possível salvar a sessão. Tente novamente.')
+      }
     },
     [user],
   )
@@ -211,28 +220,56 @@ function OperacaoPMSC() {
   const addLancamento = useCallback(
     async (l: Omit<Lancamento, 'id'>) => {
       if (!user) return
-      const saved = await insertLancamentos(user.id, [l])
-      setLancamentos((prev) => [...prev, ...saved])
+      try {
+        const saved = await insertLancamentos(user.id, [l])
+        setLancamentos((prev) => [...prev, ...saved])
+      } catch (err) {
+        console.error('Erro ao salvar lançamento:', err)
+        toast.error('Não foi possível salvar o lançamento. Tente novamente.')
+      }
     },
     [user],
   )
 
   const deleteLancamento = useCallback(async (id: string) => {
-    setLancamentos((prev) => prev.filter((l) => l.id !== id))
-    await deleteLancamentoDb(id)
+    const snapshot = await new Promise<Lancamento[]>((resolve) => {
+      setLancamentos((prev) => {
+        resolve(prev)
+        return prev.filter((l) => l.id !== id)
+      })
+    })
+    try {
+      await deleteLancamentoDb(id)
+      toast.success('Lançamento excluído.')
+    } catch (err) {
+      console.error('Erro ao excluir lançamento:', err)
+      setLancamentos(snapshot)
+      toast.error('Não foi possível excluir o lançamento.')
+    }
   }, [])
 
   const resetData = useCallback(async () => {
     if (!user) return
-    await deleteAllLancamentos(user.id)
-    setLancamentos([])
+    try {
+      await deleteAllLancamentos(user.id)
+      setLancamentos([])
+      toast.success('Dados zerados.')
+    } catch (err) {
+      console.error('Erro ao zerar dados:', err)
+      toast.error('Não foi possível zerar os dados.')
+    }
   }, [user])
 
   const skipDiscipline = useCallback(
     async (discId: string) => {
       if (!user) return
-      const next = await registerDisciplineSkip(user.id, discId, skips[discId])
-      setSkips((prev) => ({ ...prev, [discId]: next }))
+      try {
+        const next = await registerDisciplineSkip(user.id, discId, skips[discId])
+        setSkips((prev) => ({ ...prev, [discId]: next }))
+      } catch (err) {
+        console.error('Erro ao pular disciplina:', err)
+        toast.error('Não foi possível pular a disciplina.')
+      }
     },
     [user, skips],
   )
@@ -242,9 +279,15 @@ function OperacaoPMSC() {
   }, [])
 
   async function handleSignOut() {
-    await signOut()
-    navigate({ to: '/login' })
+    try {
+      await signOut()
+    } catch (err) {
+      console.error('Erro ao sair:', err)
+    } finally {
+      navigate({ to: '/login' })
+    }
   }
+
 
   if (authLoading || !user || dataLoading) {
     return (
