@@ -2,8 +2,21 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const runtimeEnv = typeof process !== 'undefined' ? process.env : undefined;
+const SUPABASE_URL =
+  import.meta.env.VITE_SUPABASE_URL ||
+  import.meta.env.SUPABASE_URL ||
+  runtimeEnv?.VITE_SUPABASE_URL ||
+  runtimeEnv?.SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY =
+  import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.VITE_SUPABASE_ANON_KEY ||
+  import.meta.env.SUPABASE_PUBLISHABLE_KEY ||
+  import.meta.env.SUPABASE_ANON_KEY ||
+  runtimeEnv?.VITE_SUPABASE_PUBLISHABLE_KEY ||
+  runtimeEnv?.VITE_SUPABASE_ANON_KEY ||
+  runtimeEnv?.SUPABASE_PUBLISHABLE_KEY ||
+  runtimeEnv?.SUPABASE_ANON_KEY;
 
 
 function isNewSupabaseApiKey(value: string): boolean {
