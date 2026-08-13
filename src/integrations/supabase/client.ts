@@ -46,13 +46,17 @@ function createSupabaseFetch(supabaseKey: string): typeof fetch {
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-  global: {
-    fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY),
-  },
-  auth: {
-    storage: typeof window !== 'undefined' ? localStorage : undefined,
-    persistSession: true,
-    autoRefreshToken: true,
+export const supabase = createClient<Database>(
+  SUPABASE_URL ?? 'https://placeholder.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY ?? 'placeholder-anon-key',
+  {
+    global: {
+      fetch: createSupabaseFetch(SUPABASE_PUBLISHABLE_KEY ?? 'placeholder-anon-key'),
+    },
+    auth: {
+      storage: typeof window !== 'undefined' ? localStorage : undefined,
+      persistSession: true,
+      autoRefreshToken: true,
+    }
   }
-});
+);
