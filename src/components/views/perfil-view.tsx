@@ -1,5 +1,6 @@
 import { Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor, CalendarDays, Clock, Target, ClipboardList, ChevronDown } from 'lucide-react'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
