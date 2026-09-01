@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react'
 import { Trophy, Percent, CalendarRange, Clock, ListChecks, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 
