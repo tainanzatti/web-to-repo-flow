@@ -1,5 +1,6 @@
 import { memo, useEffect, useState } from 'react'
 import { Trophy, Percent, CalendarRange, Clock, ListChecks, Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '@/lib/supabase'
 import { useAuth } from '@/lib/auth-context'
 
@@ -31,18 +32,21 @@ function RankingViewInner() {
   useEffect(() => {
     let cancelled = false
     setLoading(true)
-    supabase
-      .rpc('get_ranking_stats')
-      .then(({ data, error }) => {
+    void (async () => {
+      try {
+        const { data, error } = await supabase.rpc('get_ranking_stats')
         if (cancelled) return
-        if (error) {
-          console.error('Ranking error:', error)
-          setRows([])
-        } else {
-          setRows((data ?? []) as RankingRow[])
-        }
-        setLoading(false)
-      })
+        if (error) throw error
+        setRows((data ?? []) as RankingRow[])
+      } catch (err) {
+        if (cancelled) return
+        console.error('Ranking error:', err)
+        setRows([])
+        toast.error('Não foi possível carregar o ranking.')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    })()
     return () => {
       cancelled = true
     }

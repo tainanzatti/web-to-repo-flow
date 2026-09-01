@@ -1,5 +1,6 @@
 import { Crown, RotateCcw, Loader2, Check, Moon, Sun, Monitor, CalendarDays, Clock, Target, ClipboardList, ChevronDown } from 'lucide-react'
-import { memo, useEffect, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { toast } from 'sonner'
 import { type Lancamento } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
@@ -44,6 +45,10 @@ function PerfilViewInner({ lancamentos, onReset }: Props) {
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // Evita setState após desmontar o componente.
+  useEffect(() => () => clearTimeout(savedTimer.current), [])
 
   useEffect(() => {
     if (!profile) return
@@ -57,22 +62,26 @@ function PerfilViewInner({ lancamentos, onReset }: Props) {
     if (!user) return
     setSaving(true)
     setSaved(false)
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName,
-        cpf: cpf || null,
-        date_of_birth: dateOfBirth || null,
-        phone: phone || null,
-      } as never)
-      .eq('id', user.id)
-    setSaving(false)
-    if (error) {
-      console.error('Erro ao salvar perfil:', error)
-      return
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          cpf: cpf || null,
+          date_of_birth: dateOfBirth || null,
+          phone: phone || null,
+        } as never)
+        .eq('id', user.id)
+      if (error) throw error
+      setSaved(true)
+      toast.success('Perfil atualizado.')
+      savedTimer.current = setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      console.error('Erro ao salvar perfil:', err)
+      toast.error('Não foi possível salvar seu perfil. Tente novamente.')
+    } finally {
+      setSaving(false)
     }
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
   }
 
   return (
