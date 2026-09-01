@@ -45,6 +45,10 @@ function PerfilViewInner({ lancamentos, onReset }: Props) {
   const [dateOfBirth, setDateOfBirth] = useState('')
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const savedTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
+
+  // Evita setState após desmontar o componente.
+  useEffect(() => () => clearTimeout(savedTimer.current), [])
 
   useEffect(() => {
     if (!profile) return
