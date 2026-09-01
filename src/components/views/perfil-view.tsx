@@ -57,22 +57,26 @@ function PerfilViewInner({ lancamentos, onReset }: Props) {
     if (!user) return
     setSaving(true)
     setSaved(false)
-    const { error } = await supabase
-      .from('profiles')
-      .update({
-        full_name: fullName,
-        cpf: cpf || null,
-        date_of_birth: dateOfBirth || null,
-        phone: phone || null,
-      } as never)
-      .eq('id', user.id)
-    setSaving(false)
-    if (error) {
-      console.error('Erro ao salvar perfil:', error)
-      return
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          full_name: fullName,
+          cpf: cpf || null,
+          date_of_birth: dateOfBirth || null,
+          phone: phone || null,
+        } as never)
+        .eq('id', user.id)
+      if (error) throw error
+      setSaved(true)
+      toast.success('Perfil atualizado.')
+      savedTimer.current = setTimeout(() => setSaved(false), 2000)
+    } catch (err) {
+      console.error('Erro ao salvar perfil:', err)
+      toast.error('Não foi possível salvar seu perfil. Tente novamente.')
+    } finally {
+      setSaving(false)
     }
-    setSaved(true)
-    setTimeout(() => setSaved(false), 2000)
   }
 
   return (
