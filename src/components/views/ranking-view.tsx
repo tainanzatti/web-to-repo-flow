@@ -38,10 +38,19 @@ function RankingViewInner() {
         if (error) {
           console.error('Ranking error:', error)
           setRows([])
+          toast.error('Não foi possível carregar o ranking.')
         } else {
           setRows((data ?? []) as RankingRow[])
         }
-        setLoading(false)
+      })
+      .catch((err) => {
+        if (cancelled) return
+        console.error('Ranking error:', err)
+        setRows([])
+        toast.error('Não foi possível carregar o ranking.')
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
       })
     return () => {
       cancelled = true
