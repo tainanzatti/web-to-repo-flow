@@ -11,11 +11,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { AuthShell, FieldError } from '@/components/auth-shell';
 import { toast } from 'sonner';
 import { AlertCircle, Loader2 } from 'lucide-react';
+import { useHydrated } from '@/hooks/use-hydrated';
 
 function LoginPage() {
   const navigate = useNavigate();
   const { signIn } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
+  const hydrated = useHydrated();
   const [error, setError] = useState<string | null>(null);
 
   const {
@@ -95,7 +97,7 @@ function LoginPage() {
           <FieldError message={errors.password?.message} />
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button type="submit" className="w-full" disabled={isLoading || !hydrated}>
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {isLoading ? 'Entrando...' : 'Entrar'}
         </Button>
