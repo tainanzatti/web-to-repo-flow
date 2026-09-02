@@ -88,61 +88,85 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   ) => {
     // O perfil é criado automaticamente por um gatilho no banco
     // a partir dos metadados enviados aqui.
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: typeof window !== "undefined" ? window.location.origin : undefined,
-        data: {
-          full_name: fullName,
-          date_of_birth: dateOfBirth,
-          cpf,
+    let data, error
+    try {
+      ;({ data, error } = await supabase.auth.signUp({
+        email: email.trim().toLowerCase(),
+        password,
+        options: {
+          emailRedirectTo: typeof window !== 'undefined' ? window.location.origin : undefined,
+          data: {
+            full_name: fullName,
+            date_of_birth: dateOfBirth,
+            cpf,
+          },
         },
-      },
-    });
+      }))
+    } catch (err) {
+      throw new AuthError(err)
+    }
 
-    if (error) throw error;
-    if (!data.user) throw new Error("User creation failed");
+    if (error) throw new AuthError(error)
+    if (!data?.user) throw new Error('Não foi possível criar a conta. Tente novamente.')
 
     if (data.session) {
-      setUser(data.user);
-      await fetchProfile(data.user.id);
+      setUser(data.user)
+      await fetchProfile(data.user.id)
     }
-  };
+  }
 
   const signIn = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-
-    if (error) throw error;
-    if (data.user) {
-      setUser(data.user);
-      await fetchProfile(data.user.id);
+    let data, error
+    try {
+      ;({ data, error } = await supabase.auth.signInWithPassword({
+        email: email.trim().toLowerCase(),
+        password,
+      }))
+    } catch (err) {
+      throw new AuthError(err)
     }
-  };
+
+    if (error) throw new AuthError(error)
+    if (data?.user) {
+      setUser(data.user)
+      await fetchProfile(data.user.id)
+    }
+  }
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
-    setUser(null);
-    setProfile(null);
-  };
+    try {
+      const { error } = await supabase.auth.signOut()
+      if (error) throw new AuthError(error)
+    } catch (err) {
+      throw new AuthError(err)
+    } finally {
+      setUser(null)
+      setProfile(null)
+    }
+  }
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
-    });
-    if (error) throw error;
-  };
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), {
+        redirectTo: `${window.location.origin}/reset-password`,
+      })
+      if (error) throw new AuthError(error)
+    } catch (err) {
+      throw new AuthError(err)
+    }
+  }
 
   const updatePassword = async (newPassword: string, _token: string) => {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword,
-    });
-    if (error) throw error;
-  };
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      })
+      if (error) throw new AuthError(error)
+    } catch (err) {
+      throw new AuthError(err)
+    }
+  }
+
 
   return (
     <AuthContext.Provider
