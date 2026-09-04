@@ -56,7 +56,9 @@ export function MaterialModal({
 
   useEffect(() => {
     if (!user) return
-    fetchMaterialLinks(user.id, discId, topicId).then(setLinks)
+    fetchMaterialLinks(user.id, discId, topicId)
+      .then(setLinks)
+      .catch((err) => console.error('Erro ao carregar links do material:', err))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discId, topicId, user])
 

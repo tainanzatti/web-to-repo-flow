@@ -30,6 +30,10 @@ async function callGateway(
   messages: { role: string; content: string }[],
   maxTokens = 1600,
 ): Promise<{ text: string } | { error: string }> {
+  if (!process.env.LOVABLE_API_KEY) {
+    console.error('[AI] LOVABLE_API_KEY ausente no ambiente do servidor')
+    return { error: 'Serviço de IA não configurado. Tente novamente mais tarde.' }
+  }
   try {
     const res = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
