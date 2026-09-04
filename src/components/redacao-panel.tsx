@@ -32,7 +32,12 @@ export function RedacaoPanel({ onNota }: { onNota?: (nota: number) => void }) {
 
   useEffect(() => {
     if (!user) return
-    fetchRedacoes(user.id).then(setHistorico)
+    fetchRedacoes(user.id)
+      .then(setHistorico)
+      .catch((err) => {
+        console.error('Erro ao carregar histórico de redações:', err)
+        toast.error('Não foi possível carregar seu histórico de redações.')
+      })
   }, [user])
 
   async function gerarTema() {
