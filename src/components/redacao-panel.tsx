@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Loader2, RefreshCw, Send, Sparkles, History } from 'lucide-react'
 import { generateAI, corrigirRedacaoAI } from '@/lib/ai-client'
 import { fetchRedacoes, insertRedacao, type Redacao } from '@/lib/db'
