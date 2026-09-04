@@ -408,7 +408,7 @@ function CicloViewInner({ lancamentos, skips = {}, onOpenMaterial, onConcluir }:
             </div>
           </div>
 
-          <AmmoBelt topics={heroTopics} height={40} />
+          <AmmoBelt topics={heroTopics} height={28} />
 
           <div className="mt-4 space-y-2 min-h-[168px]">
             {heroTopics.map((t) => {
@@ -423,11 +423,15 @@ function CicloViewInner({ lancamentos, skips = {}, onOpenMaterial, onConcluir }:
                   <PesoBadge value={t.fib} />
                   <span
                     className="w-16 shrink-0 text-right font-mono text-[10px]"
-                    style={{ color: tier.token }}
+                    style={
+                      tier.key === 'sem-dados'
+                        ? { color: 'var(--muted-foreground)' }
+                        : { color: tier.token }
+                    }
                   >
                     {tier.key === 'sem-dados' ? 'sem dados' : `${t.mastery}%`}
                   </span>
-                  <span className="w-8 shrink-0 text-right font-mono text-[10px] text-foreground">
+                  <span className="w-8 shrink-0 text-right font-mono text-[10px] text-muted-foreground">
                     {t.minutes}′
                   </span>
                   <IconTip label="Abrir materiais deste tópico" side="left">
