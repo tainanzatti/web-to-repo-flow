@@ -42,7 +42,7 @@ export function SectionLabel({
 // ============================== Badge de peso ==============================
 export function PesoBadge({ value }: { value: number }) {
   return (
-    <span className="shrink-0 rounded-sm border border-faint/40 px-1.5 py-0.5 font-mono text-[10px] text-faint">
+    <span className="shrink-0 rounded-full bg-muted/40 px-2 py-0.5 font-mono text-[10px] text-muted-foreground">
       peso {value}
     </span>
   )
@@ -70,29 +70,28 @@ function AmmoBeltSegment({
 }) {
   const [hover, setHover] = useState(false)
   const tier = tierInfo(topic.mastery)
-  const isStripe = tier.key === 'sem-dados'
-  const lightText = tier.key === 'dominado' || tier.key === 'bom'
+  const isEmpty = tier.key === 'sem-dados'
   return (
     <div
-      className="relative flex h-full items-center justify-center transition-[filter] duration-200 hover:brightness-110"
+      className="relative flex h-full items-center justify-center transition-opacity duration-200 hover:opacity-80"
       style={{
         width: `${(topic.minutes / 60) * 100}%`,
-        background: isStripe
-          ? `repeating-linear-gradient(135deg, color-mix(in srgb, ${tier.token} 55%, transparent) 0px, color-mix(in srgb, ${tier.token} 55%, transparent) 6px, color-mix(in srgb, ${tier.token} 20%, transparent) 6px, color-mix(in srgb, ${tier.token} 20%, transparent) 12px)`
-          : tier.token,
+        background: isEmpty
+          ? `color-mix(in srgb, ${tier.token} 18%, transparent)`
+          : `color-mix(in srgb, ${tier.token} 75%, transparent)`,
         borderRight: isLast ? 'none' : '1px solid var(--background)',
-        borderTopLeftRadius: isFirst ? 5 : 0,
-        borderBottomLeftRadius: isFirst ? 5 : 0,
-        borderTopRightRadius: isLast ? 5 : 0,
-        borderBottomRightRadius: isLast ? 5 : 0,
+        borderTopLeftRadius: isFirst ? 999 : 0,
+        borderBottomLeftRadius: isFirst ? 999 : 0,
+        borderTopRightRadius: isLast ? 999 : 0,
+        borderBottomRightRadius: isLast ? 999 : 0,
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
     >
       {topic.minutes >= 6 && (
         <span
-          className="font-mono text-[10px] font-bold"
-          style={{ color: lightText ? 'var(--foreground)' : 'var(--background)' }}
+          className="font-mono text-[10px] font-medium"
+          style={{ color: isEmpty ? 'var(--muted-foreground)' : 'var(--background)' }}
         >
           {topic.minutes}
           {"'"}
@@ -116,14 +115,14 @@ function AmmoBeltSegment({
 
 export function AmmoBelt({
   topics,
-  height = 34,
+  height = 26,
 }: {
   topics: AllocatedTopic[]
   height?: number
 }) {
   return (
     <div
-      className="flex w-full overflow-hidden rounded-md border border-border"
+      className="flex w-full overflow-hidden rounded-full bg-muted/30"
       style={{ height }}
     >
       {topics.map((t, i) => (
