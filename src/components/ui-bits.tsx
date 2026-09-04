@@ -115,14 +115,14 @@ function AmmoBeltSegment({
 
 export function AmmoBelt({
   topics,
-  height = 34,
+  height = 26,
 }: {
   topics: AllocatedTopic[]
   height?: number
 }) {
   return (
     <div
-      className="flex w-full overflow-hidden rounded-md border border-border"
+      className="flex w-full overflow-hidden rounded-full bg-muted/30"
       style={{ height }}
     >
       {topics.map((t, i) => (
