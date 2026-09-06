@@ -41,6 +41,8 @@ import {
   fetchDisciplineSkips,
   registerDisciplineSkip,
   clearDisciplineSkipStreak,
+  fetchUserSettings,
+  upsertUserSettings,
 } from '@/lib/db'
 import { PainelView } from '@/components/views/painel-view'
 import { CicloView } from '@/components/views/ciclo-view'
