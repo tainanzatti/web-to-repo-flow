@@ -151,20 +151,43 @@ const VIEW_IDS: ViewId[] = [
 function OperacaoPMSC() {
   const navigate = useNavigate()
   const { user, profile, loading: authLoading, signOut } = useAuth()
-  // Aba ativa persistida: ao recarregar/trocar de aba do navegador, volta onde estava.
-  const [view, setViewState] = useState<ViewId>(() => {
-    if (typeof window === 'undefined') return 'painel'
-    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY)
-    return VIEW_IDS.includes(stored as ViewId) ? (stored as ViewId) : 'painel'
-  })
-  const setView = useCallback((next: ViewId) => {
-    setViewState(next)
-    try {
-      window.localStorage.setItem(VIEW_STORAGE_KEY, next)
-    } catch {
-      /* storage indisponível: mantém só em memória */
+  // Aba ativa: guardada localmente por usuário e também na conta (segue em outro aparelho).
+  const [view, setViewState] = useState<ViewId>('painel')
+  const viewKey = user ? `${VIEW_STORAGE_KEY}:${user.id}` : VIEW_STORAGE_KEY
+  const setView = useCallback(
+    (next: ViewId) => {
+      setViewState(next)
+      try {
+        window.localStorage.setItem(viewKey, next)
+      } catch {
+        /* storage indisponível: mantém só em memória */
+      }
+      if (user) {
+        fetchUserSettings(user.id)
+          .then((s) => upsertUserSettings(user.id, { ...s, activeView: next }))
+          .catch((err) => console.error('Erro ao salvar aba ativa:', err))
+      }
+    },
+    [user, viewKey],
+  )
+
+  // Restaura a última aba do usuário (local primeiro, depois a da conta)
+  useEffect(() => {
+    if (!user) return
+    let cancelled = false
+    const local = window.localStorage.getItem(`${VIEW_STORAGE_KEY}:${user.id}`)
+    if (VIEW_IDS.includes(local as ViewId)) setViewState(local as ViewId)
+    fetchUserSettings(user.id)
+      .then((s) => {
+        const remote = s?.activeView as ViewId | undefined
+        if (!cancelled && remote && VIEW_IDS.includes(remote) && !local) setViewState(remote)
+      })
+      .catch((err) => console.error('Erro ao carregar aba ativa:', err))
+    return () => {
+      cancelled = true
     }
-  }, [])
+  }, [user])
+
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [skips, setSkips] = useState<DisciplineSkips>({})
   const [dataLoading, setDataLoading] = useState(true)
