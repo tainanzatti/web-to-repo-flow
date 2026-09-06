@@ -133,7 +133,12 @@ function PainelViewInner({ lancamentos, skips = {}, onEstudar, onVerNucleo, onOp
     [lancamentos, skips],
   )
 
-  const nome = (profile?.full_name || user?.email || 'candidato').split(' ')[0]
+  const nome = (
+    profile?.full_name ||
+    (user?.user_metadata?.full_name as string | undefined) ||
+    user?.email ||
+    'candidato'
+  ).split(' ')[0]
   const hora = new Date().getHours()
   const saudacao = hora < 12 ? 'Bom dia' : hora < 18 ? 'Boa tarde' : 'Boa noite'
 
