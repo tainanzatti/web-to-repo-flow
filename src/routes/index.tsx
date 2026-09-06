@@ -135,10 +135,36 @@ const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = {
   perfil: { title: 'Meu perfil', subtitle: 'Assinatura, plano e dados pessoais' },
 }
 
+const VIEW_STORAGE_KEY = 'oppmsc:active-view'
+const VIEW_IDS: ViewId[] = [
+  'painel',
+  'ciclo',
+  'nucleo',
+  'materiais',
+  'desempenho',
+  'lancamento',
+  'comparativo',
+  'ranking',
+  'perfil',
+]
+
 function OperacaoPMSC() {
   const navigate = useNavigate()
-  const { user, loading: authLoading, signOut } = useAuth()
-  const [view, setView] = useState<ViewId>('painel')
+  const { user, profile, loading: authLoading, signOut } = useAuth()
+  // Aba ativa persistida: ao recarregar/trocar de aba do navegador, volta onde estava.
+  const [view, setViewState] = useState<ViewId>(() => {
+    if (typeof window === 'undefined') return 'painel'
+    const stored = window.localStorage.getItem(VIEW_STORAGE_KEY)
+    return VIEW_IDS.includes(stored as ViewId) ? (stored as ViewId) : 'painel'
+  })
+  const setView = useCallback((next: ViewId) => {
+    setViewState(next)
+    try {
+      window.localStorage.setItem(VIEW_STORAGE_KEY, next)
+    } catch {
+      /* storage indisponível: mantém só em memória */
+    }
+  }, [])
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([])
   const [skips, setSkips] = useState<DisciplineSkips>({})
   const [dataLoading, setDataLoading] = useState(true)
