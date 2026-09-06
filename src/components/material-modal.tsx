@@ -62,7 +62,7 @@ export function MaterialModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [discId, topicId, user])
 
-  const cacheKey = (tab: string) => `mat:${discId}:${topicId}:${tab}`
+  const cacheKey = (tab: string) => `mat:${user?.id ?? 'anon'}:${discId}:${topicId}:${tab}`
 
   useEffect(() => {
     if (activeTab === 'leiseca') return

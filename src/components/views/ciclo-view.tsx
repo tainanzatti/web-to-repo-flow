@@ -190,7 +190,7 @@ function Heatmap({ lancamentos }: { lancamentos: Lancamento[] }) {
 function Briefing({ lancamentos }: { lancamentos: Lancamento[] }) {
   const { user } = useAuth()
   const today = new Date().toISOString().slice(0, 10)
-  const todayKey = `briefing:${today}`
+  const todayKey = `briefing:${user?.id ?? 'anon'}:${today}`
   const [state, setState] = useState<
     | { status: 'idle' | 'loading' }
     | { status: 'ready'; text: string; fresh: boolean }
