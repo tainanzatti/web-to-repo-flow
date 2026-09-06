@@ -388,11 +388,13 @@ function OperacaoPMSC() {
         <div className="border-t border-sidebar-border px-5 py-4">
           <div className="flex items-center gap-2.5">
             <span className="flex h-8 w-8 items-center justify-center rounded-full bg-card-raised font-display text-xs font-bold text-primary">
-              {(user.email ?? '??').slice(0, 2).toUpperCase()}
+              {(profile?.full_name || (user.user_metadata?.full_name as string | undefined) || user.email || '??')
+                .slice(0, 2)
+                .toUpperCase()}
             </span>
             <div className="min-w-0 flex-1 leading-tight">
               <div className="truncate text-[12px] font-semibold text-foreground">
-                {user.email}
+                {profile?.full_name || (user.user_metadata?.full_name as string | undefined) || user.email}
               </div>
               <div className="text-[10px] text-faint">[PMSC] Soldado 2026</div>
             </div>
