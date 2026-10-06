@@ -16,6 +16,7 @@ Novo recurso "Simulados": prova completa no estilo AOCP, cronometrada, gerada po
   - Informática: 5
 - **1 redação** ao final (tema gerado por IA, texto de 20 a 30 linhas), corrigida pela IA com nota 0–10 — mesma mecânica da aba Redação.
 - **Tempo máximo: 5 horas**, cronômetro regressivo na tela. Ao esgotar, a prova finaliza sozinha.
+- **Nota final do simulado: 75% da prova objetiva (acertos/60) + 25% da nota da redação (0–10).** Exibida só após a correção da redação, junto das notas separadas de cada parte.
 - Formato completo é o padrão; ao iniciar, o candidato vê esse resumo antes de começar.
 
 ## O que o usuário verá
