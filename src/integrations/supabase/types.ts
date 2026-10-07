@@ -242,6 +242,60 @@ export type Database = {
         }
         Relationships: []
       }
+      simulados: {
+        Row: {
+          created_at: string
+          finalizado_em: string | null
+          id: string
+          iniciado_em: string
+          nota_final: number | null
+          nota_objetiva: number | null
+          questoes: Json
+          redacao_feedback: Json | null
+          redacao_nota: number | null
+          redacao_tema: string | null
+          redacao_texto: string | null
+          respostas: Json
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          nota_final?: number | null
+          nota_objetiva?: number | null
+          questoes?: Json
+          redacao_feedback?: Json | null
+          redacao_nota?: number | null
+          redacao_tema?: string | null
+          redacao_texto?: string | null
+          respostas?: Json
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          finalizado_em?: string | null
+          id?: string
+          iniciado_em?: string
+          nota_final?: number | null
+          nota_objetiva?: number | null
+          questoes?: Json
+          redacao_feedback?: Json | null
+          redacao_nota?: number | null
+          redacao_tema?: string | null
+          redacao_texto?: string | null
+          respostas?: Json
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string
