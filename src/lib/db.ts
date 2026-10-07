@@ -374,3 +374,144 @@ export async function insertRedacao(
   if (error) throw error
   return mapRedacao(data as unknown as RedacaoRow)
 }
+
+// ---------- Simulados (prova completa 60 questões + redação) ----------
+
+import type { SimuladoQuestion } from './simulado'
+
+export type SimuladoStatus = 'em_andamento' | 'concluida'
+export type SimuladoRespostas = Record<string, string>
+
+export type Simulado = {
+  id: string
+  status: SimuladoStatus
+  questoes: SimuladoQuestion[]
+  respostas: SimuladoRespostas
+  redacaoTema: string | null
+  redacaoTexto: string | null
+  redacaoNota: number | null
+  redacaoFeedback: Record<string, string> | null
+  notaObjetiva: number | null
+  notaFinal: number | null
+  iniciadoEm: string
+  finalizadoEm: string | null
+}
+
+type SimuladoRow = {
+  id: string
+  status: string
+  questoes: unknown
+  respostas: unknown
+  redacao_tema: string | null
+  redacao_texto: string | null
+  redacao_nota: number | string | null
+  redacao_feedback: unknown
+  nota_objetiva: number | string | null
+  nota_final: number | string | null
+  iniciado_em: string
+  finalizado_em: string | null
+}
+
+function mapSimulado(row: SimuladoRow): Simulado {
+  return {
+    id: row.id,
+    status: row.status === 'concluida' ? 'concluida' : 'em_andamento',
+    questoes: (row.questoes ?? []) as SimuladoQuestion[],
+    respostas: (row.respostas ?? {}) as SimuladoRespostas,
+    redacaoTema: row.redacao_tema,
+    redacaoTexto: row.redacao_texto,
+    redacaoNota: row.redacao_nota === null ? null : Number(row.redacao_nota),
+    redacaoFeedback: (row.redacao_feedback ?? null) as Record<string, string> | null,
+    notaObjetiva: row.nota_objetiva === null ? null : Number(row.nota_objetiva),
+    notaFinal: row.nota_final === null ? null : Number(row.nota_final),
+    iniciadoEm: row.iniciado_em,
+    finalizadoEm: row.finalizado_em,
+  }
+}
+
+const SIMULADO_SELECT =
+  'id, status, questoes, respostas, redacao_tema, redacao_texto, redacao_nota, redacao_feedback, nota_objetiva, nota_final, iniciado_em, finalizado_em'
+
+export async function fetchSimulados(userId: string): Promise<Simulado[]> {
+  const { data, error } = await supabase
+    .from('simulados')
+    .select(SIMULADO_SELECT)
+    .eq('user_id', userId)
+    .order('iniciado_em', { ascending: false })
+    .limit(20)
+
+  if (error) {
+    console.error('Erro ao buscar simulados:', error)
+    return []
+  }
+  return (data ?? []).map((row) => mapSimulado(row as unknown as SimuladoRow))
+}
+
+export async function fetchSimuladoEmAndamento(userId: string): Promise<Simulado | null> {
+  const { data, error } = await supabase
+    .from('simulados')
+    .select(SIMULADO_SELECT)
+    .eq('user_id', userId)
+    .eq('status', 'em_andamento')
+    .order('iniciado_em', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error('Erro ao buscar simulado em andamento:', error)
+    return null
+  }
+  return data ? mapSimulado(data as unknown as SimuladoRow) : null
+}
+
+export async function insertSimulado(
+  userId: string,
+  questoes: SimuladoQuestion[]
+): Promise<Simulado> {
+  const { data, error } = await supabase
+    .from('simulados')
+    .insert({
+      user_id: userId,
+      status: 'em_andamento',
+      questoes: questoes as unknown as Json,
+    })
+    .select(SIMULADO_SELECT)
+    .single()
+
+  if (error) throw error
+  return mapSimulado(data as unknown as SimuladoRow)
+}
+
+export type SimuladoPatch = {
+  status?: SimuladoStatus
+  respostas?: SimuladoRespostas
+  redacaoTema?: string
+  redacaoTexto?: string
+  redacaoNota?: number
+  redacaoFeedback?: Record<string, string> | null
+  notaObjetiva?: number
+  notaFinal?: number
+  finalizadoEm?: string
+}
+
+export async function updateSimulado(id: string, patch: SimuladoPatch): Promise<void> {
+  const row: Record<string, unknown> = {}
+  if (patch.status !== undefined) row.status = patch.status
+  if (patch.respostas !== undefined) row.respostas = patch.respostas as unknown as Json
+  if (patch.redacaoTema !== undefined) row.redacao_tema = patch.redacaoTema
+  if (patch.redacaoTexto !== undefined) row.redacao_texto = patch.redacaoTexto
+  if (patch.redacaoNota !== undefined) row.redacao_nota = patch.redacaoNota
+  if (patch.redacaoFeedback !== undefined)
+    row.redacao_feedback = (patch.redacaoFeedback ?? null) as Json
+  if (patch.notaObjetiva !== undefined) row.nota_objetiva = patch.notaObjetiva
+  if (patch.notaFinal !== undefined) row.nota_final = patch.notaFinal
+  if (patch.finalizadoEm !== undefined) row.finalizado_em = patch.finalizadoEm
+
+  const { error } = await supabase.from('simulados').update(row).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteSimulado(id: string): Promise<void> {
+  const { error } = await supabase.from('simulados').delete().eq('id', id)
+  if (error) throw error
+}
