@@ -31,7 +31,7 @@ export const SIMULADO_PESO_REDACAO = 0.25
 
 /** Nota objetiva 0–10 = acertos/60 × 10. */
 export function calcularNotaObjetiva(acertos: number): number {
-  return Math.round((acertos / SIMULADO_TOTAL) * 1000) / 10
+  return Math.round((acertos / SIMULADO_TOTAL) * 100) / 10
 }
 
 /** Nota final = 75% objetiva + 25% redação (0–10). */

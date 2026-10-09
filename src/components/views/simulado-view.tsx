@@ -519,6 +519,10 @@ export function SimuladoView({
   // ---------- Render: redação ----------
   if (fase === 'redacao' && prova) {
     const notaObj = prova.notaObjetiva ?? 0
+    const acertosObj = prova.questoes.reduce(
+      (s, q, i) => s + (prova.respostas[String(i)] === q.correta ? 1 : 0),
+      0
+    )
     return (
       <div className="space-y-5">
         <div className="rounded-xl border border-primary/30 bg-card-raised p-4">
@@ -526,8 +530,8 @@ export function SimuladoView({
             <Award size={12} className="text-primary" /> Prova objetiva encerrada
           </div>
           <p className="text-[13px] text-foreground">
-            Acertos: <strong>{Math.round((notaObj / 10) * SIMULADO_TOTAL)}</strong> de{' '}
-            {prova.questoes.length} — nota objetiva {notaObj.toFixed(1)}.
+            Acertos: <strong>{acertosObj}</strong> de {prova.questoes.length} — nota objetiva{' '}
+            {notaObj.toFixed(1)}.
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Agora a redação. A nota final do simulado é{' '}
