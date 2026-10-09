@@ -8,6 +8,13 @@
       "when": 1791377446505,
       "tag": "0000_create_simulados",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1791550967484,
+      "tag": "0001_migration",
+      "breakpoints": true
     }
   ]
 }
