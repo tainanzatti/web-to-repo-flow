@@ -490,12 +490,12 @@ export type SimuladoPatch = {
   redacaoNota?: number
   redacaoFeedback?: Record<string, string> | null
   notaObjetiva?: number
-  notaFinal?: number
+  notaFinal?: number | null
   finalizadoEm?: string
 }
 
 export async function updateSimulado(id: string, patch: SimuladoPatch): Promise<void> {
-  const row: Database['public']['Update']['simulados'] = {}
+  const row: Database['public']['Tables']['simulados']['Update'] = {}
   if (patch.status !== undefined) row.status = patch.status
   if (patch.respostas !== undefined) row.respostas = patch.respostas as Json
   if (patch.redacaoTema !== undefined) row.redacao_tema = patch.redacaoTema
