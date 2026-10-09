@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { DisciplineSkips, Lancamento, SkipState } from './curriculum'
+import type { Database, DisciplineSkips, Json, Lancamento, SkipState } from './curriculum'
 import type { Json } from '@/integrations/supabase/types'
 
 // ============================================================================
@@ -495,9 +495,9 @@ export type SimuladoPatch = {
 }
 
 export async function updateSimulado(id: string, patch: SimuladoPatch): Promise<void> {
-  const row: Record<string, unknown> = {}
+  const row: Database['public']['Update']['simulados'] = {}
   if (patch.status !== undefined) row.status = patch.status
-  if (patch.respostas !== undefined) row.respostas = patch.respostas as unknown as Json
+  if (patch.respostas !== undefined) row.respostas = patch.respostas as Json
   if (patch.redacaoTema !== undefined) row.redacao_tema = patch.redacaoTema
   if (patch.redacaoTexto !== undefined) row.redacao_texto = patch.redacaoTexto
   if (patch.redacaoNota !== undefined) row.redacao_nota = patch.redacaoNota
