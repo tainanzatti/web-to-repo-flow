@@ -9,6 +9,7 @@ import {
   BookOpen,
   BarChart3,
   ClipboardList,
+  FileText,
   LineChart,
   Trophy,
   User,
@@ -52,6 +53,7 @@ import { DesempenhoView } from '@/components/views/desempenho-view'
 import { LancamentoView } from '@/components/views/lancamento-view'
 import { ComparativoView } from '@/components/views/comparativo-view'
 import { RankingView } from '@/components/views/ranking-view'
+import { SimuladoView } from '@/components/views/simulado-view'
 import { PerfilView } from '@/components/views/perfil-view'
 import { ConcluirModal } from '@/components/concluir-modal'
 import { MaterialModal } from '@/components/material-modal'
@@ -96,6 +98,7 @@ type ViewId =
   | 'materiais'
   | 'desempenho'
   | 'lancamento'
+  | 'simulado'
   | 'comparativo'
   | 'ranking'
   | 'perfil'
@@ -115,6 +118,7 @@ const NAV: { section: string; items: { id: ViewId; label: string; icon: LucideIc
     section: 'Gestão de estudos',
     items: [
       { id: 'lancamento', label: 'Lançamento de questões', icon: ClipboardList },
+      { id: 'simulado', label: 'Simulados', icon: FileText },
       { id: 'comparativo', label: 'Comparativo', icon: LineChart },
       { id: 'ranking', label: 'Ranking', icon: Trophy },
     ],
@@ -132,6 +136,10 @@ const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = {
   materiais: { title: 'Materiais', subtitle: '[PMSC] Soldado 2026 — materiais por assunto' },
   desempenho: { title: 'Desempenho', subtitle: 'Acompanhe seu progresso pessoal' },
   lancamento: { title: 'Lançamento de questões', subtitle: 'Registre seus resultados diários' },
+  simulado: {
+    title: 'Simulados',
+    subtitle: 'Prova completa no padrão PMSC — 60 questões + redação',
+  },
   comparativo: { title: 'Comparativo', subtitle: 'Seus resultados em relação aos outros alunos' },
   ranking: { title: 'Ranking', subtitle: 'Suas posições no ranking da plataforma' },
   perfil: { title: 'Meu perfil', subtitle: 'Assinatura, plano e dados pessoais' },
@@ -144,7 +152,8 @@ const VIEW_IDS: ViewId[] = [
   'nucleo',
   'materiais',
   'desempenho',
-  'lancamento',
+'lancamento',
+  'simulado',
   'comparativo',
   'ranking',
   'perfil',
@@ -510,6 +519,12 @@ function OperacaoPMSC() {
             )}
             {view === 'desempenho' && (
               <DesempenhoView lancamentos={lancamentos} skips={skips} />
+            )}
+            {view === 'simulado' && (
+              <SimuladoView
+                lancamentos={lancamentos}
+                onLancamentosAdded={(rows) => setLancamentos((prev) => [...prev, ...rows])}
+              />
             )}
             {view === 'lancamento' && (
               <LancamentoView

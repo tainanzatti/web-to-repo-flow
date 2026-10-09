@@ -277,19 +277,16 @@ export function SimuladoView({
         Math.min(SIMULADO_LIMIT_MIN, Math.round((Date.now() - inicioMs) / 60000))
       )
       const total = prova.questoes.length || 1
-      const entries: Omit<Lancamento, 'id'>[] = [...porTopico.values()].map((v) => ({
-        disciplinaId: v.discId,
-        topicoId: Object.keys(porTopico).length > 0 ? '' : '',
-        quantidade: v.qtd,
-        acertos: v.acertos,
-        minutos: Math.max(1, Math.round((minutosTotais * v.qtd) / total)),
-        data: hoje,
-      }))
-      // topicoId correto (mapa não guarda a chave — reconstroi abaixo)
-      let j = 0
+      const entries: Omit<Lancamento, 'id'>[] = []
       for (const [topicoId, v] of porTopico.entries()) {
-        entries[j] = { ...entries[j], topicoId }
-        j++
+        entries.push({
+          disciplinaId: v.discId,
+          topicoId,
+          quantidade: v.qtd,
+          acertos: v.acertos,
+          minutos: Math.max(1, Math.round((minutosTotais * v.qtd) / total)),
+          data: hoje,
+        })
       }
       entries.push({
         disciplinaId: 'redacao',
