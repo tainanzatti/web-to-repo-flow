@@ -788,7 +788,7 @@ export function SimuladoView({
         )}
         <button
           onClick={iniciar}
-          disabled={carregando || fase === 'gerando'}
+          disabled={carregando}
           className="mt-4 flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 font-display text-xs font-bold text-primary-foreground transition hover:brightness-110 active:scale-95 disabled:opacity-60"
         >
           <Play size={13} /> Iniciar simulado

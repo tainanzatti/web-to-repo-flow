@@ -1,6 +1,6 @@
 import { supabase } from './supabase'
-import type { Database, DisciplineSkips, Json, Lancamento, SkipState } from './curriculum'
-import type { Json } from '@/integrations/supabase/types'
+import type { DisciplineSkips, Lancamento, SkipState } from './curriculum'
+import type { Database, Json } from '@/integrations/supabase/types'
 
 // ============================================================================
 // Camada central de acesso ao banco (Lovable Cloud).
