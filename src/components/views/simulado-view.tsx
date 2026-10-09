@@ -277,19 +277,16 @@ export function SimuladoView({
         Math.min(SIMULADO_LIMIT_MIN, Math.round((Date.now() - inicioMs) / 60000))
       )
       const total = prova.questoes.length || 1
-      const entries: Omit<Lancamento, 'id'>[] = [...porTopico.values()].map((v) => ({
-        disciplinaId: v.discId,
-        topicoId: Object.keys(porTopico).length > 0 ? '' : '',
-        quantidade: v.qtd,
-        acertos: v.acertos,
-        minutos: Math.max(1, Math.round((minutosTotais * v.qtd) / total)),
-        data: hoje,
-      }))
-      // topicoId correto (mapa não guarda a chave — reconstroi abaixo)
-      let j = 0
+      const entries: Omit<Lancamento, 'id'>[] = []
       for (const [topicoId, v] of porTopico.entries()) {
-        entries[j] = { ...entries[j], topicoId }
-        j++
+        entries.push({
+          disciplinaId: v.discId,
+          topicoId,
+          quantidade: v.qtd,
+          acertos: v.acertos,
+          minutos: Math.max(1, Math.round((minutosTotais * v.qtd) / total)),
+          data: hoje,
+        })
       }
       entries.push({
         disciplinaId: 'redacao',
@@ -522,6 +519,10 @@ export function SimuladoView({
   // ---------- Render: redação ----------
   if (fase === 'redacao' && prova) {
     const notaObj = prova.notaObjetiva ?? 0
+    const acertosObj = prova.questoes.reduce(
+      (s, q, i) => s + (prova.respostas[String(i)] === q.correta ? 1 : 0),
+      0
+    )
     return (
       <div className="space-y-5">
         <div className="rounded-xl border border-primary/30 bg-card-raised p-4">
@@ -529,8 +530,8 @@ export function SimuladoView({
             <Award size={12} className="text-primary" /> Prova objetiva encerrada
           </div>
           <p className="text-[13px] text-foreground">
-            Acertos: <strong>{Math.round((notaObj / 10) * SIMULADO_TOTAL)}</strong> de{' '}
-            {prova.questoes.length} — nota objetiva {notaObj.toFixed(1)}.
+            Acertos: <strong>{acertosObj}</strong> de {prova.questoes.length} — nota objetiva{' '}
+            {notaObj.toFixed(1)}.
           </p>
           <p className="mt-1 text-[11px] text-muted-foreground">
             Agora a redação. A nota final do simulado é{' '}
@@ -791,7 +792,7 @@ export function SimuladoView({
         )}
         <button
           onClick={iniciar}
-          disabled={carregando || fase === 'gerando'}
+          disabled={carregando}
           className="mt-4 flex items-center gap-2 rounded-md bg-primary px-5 py-2.5 font-display text-xs font-bold text-primary-foreground transition hover:brightness-110 active:scale-95 disabled:opacity-60"
         >
           <Play size={13} /> Iniciar simulado
