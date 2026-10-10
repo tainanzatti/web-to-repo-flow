@@ -6,13 +6,7 @@ import { fetchRedacoes, insertRedacao, type Redacao } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
 import { TypewriterMarkdown } from '@/components/ui-bits'
 
-const CRITERIOS: { key: string; label: string }[] = [
-  { key: 'compreensao_do_tema', label: 'Compreensão do tema' },
-  { key: 'argumentacao', label: 'Argumentação' },
-  { key: 'estrutura_coesao', label: 'Estrutura e coesão' },
-  { key: 'norma_culta', label: 'Norma culta' },
-  { key: 'conclusao_proposta', label: 'Conclusão / proposta' },
-]
+import { CRITERIOS_REDACAO as CRITERIOS } from '@/lib/redacao-criterios'
 
 function notaColor(nota: number): string {
   if (nota < 5) return 'var(--tier-weak)'
@@ -134,7 +128,7 @@ export function RedacaoPanel({ onNota }: { onNota?: (nota: number) => void }) {
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             rows={12}
-            placeholder="Escreva aqui sua redação completa: introdução com tese, desenvolvimento argumentativo e conclusão com proposta de intervenção."
+            placeholder="Escreva aqui sua redação completa: texto dissertativo de 20 a 30 linhas, atendendo a todos os aspectos do comando."
             className="w-full resize-y rounded-md border border-border bg-background px-3 py-2.5 text-[13px] leading-relaxed text-foreground placeholder:text-faint outline-none transition focus:border-primary/60 focus:ring-1 focus:ring-primary/40"
           />
           <div className="mt-2 flex items-center justify-between gap-3">
