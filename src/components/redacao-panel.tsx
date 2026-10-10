@@ -6,13 +6,7 @@ import { fetchRedacoes, insertRedacao, type Redacao } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
 import { TypewriterMarkdown } from '@/components/ui-bits'
 
-const CRITERIOS: { key: string; label: string }[] = [
-  { key: 'compreensao_do_tema', label: 'Compreensão do tema' },
-  { key: 'argumentacao', label: 'Argumentação' },
-  { key: 'estrutura_coesao', label: 'Estrutura e coesão' },
-  { key: 'norma_culta', label: 'Norma culta' },
-  { key: 'conclusao_proposta', label: 'Conclusão / proposta' },
-]
+import { CRITERIOS_REDACAO as CRITERIOS } from '@/lib/redacao-criterios'
 
 function notaColor(nota: number): string {
   if (nota < 5) return 'var(--tier-weak)'
