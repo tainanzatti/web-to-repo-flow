@@ -128,7 +128,7 @@ export function RedacaoPanel({ onNota }: { onNota?: (nota: number) => void }) {
             value={texto}
             onChange={(e) => setTexto(e.target.value)}
             rows={12}
-            placeholder="Escreva aqui sua redação completa: introdução com tese, desenvolvimento argumentativo e conclusão com proposta de intervenção."
+            placeholder="Escreva aqui sua redação completa: texto dissertativo de 20 a 30 linhas, atendendo a todos os aspectos do comando."
             className="w-full resize-y rounded-md border border-border bg-background px-3 py-2.5 text-[13px] leading-relaxed text-foreground placeholder:text-faint outline-none transition focus:border-primary/60 focus:ring-1 focus:ring-primary/40"
           />
           <div className="mt-2 flex items-center justify-between gap-3">
