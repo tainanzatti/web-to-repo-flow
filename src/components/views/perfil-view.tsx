@@ -6,14 +6,13 @@ import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
 import { useTheme, type ThemeMode } from '@/lib/theme-context'
 import { supabase } from '@/lib/supabase'
+import { EXAM_DATE } from '@/lib/cronograma'
 
 type Props = {
   lancamentos: Lancamento[]
   onReset: () => void
 }
 
-// Data prevista da prova (PMSC Soldado 2026).
-const EXAM_DATE = '2026-07-09'
 
 function PerfilViewInner({ lancamentos, onReset }: Props) {
   const { user, profile } = useAuth()
