@@ -1,3 +1,4 @@
+import { studyPhase } from '@/lib/cronograma'
 import { memo, useMemo, useState } from 'react'
 import {
   ResponsiveContainer,
@@ -26,7 +27,7 @@ import {
 import {
   CURRICULUM,
   ROTATION_ORDER,
-  MAINTENANCE_DUE_DAYS,
+  MAINTENANCE_DUE_DAYS as _MDD,
   disciplineAggregate,
   disciplineTopicsWithMastery,
   tierInfo,
@@ -301,7 +302,7 @@ function TopicBreakdown({ lancamentos }: { lancamentos: Lancamento[] }) {
                         const overdue =
                           tier.key === 'dominado' &&
                           typeof t.daysSinceReview === 'number' &&
-                          t.daysSinceReview >= MAINTENANCE_DUE_DAYS
+                          t.daysSinceReview >= studyPhase().maintenanceDueDays
                         return (
                           <tr
                             key={t.id}

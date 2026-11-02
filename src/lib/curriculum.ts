@@ -3,6 +3,8 @@
 // Lógica portada do protótipo original, tipada em TypeScript.
 // ============================================================================
 
+import { studyPhase } from './cronograma'
+
 export type Topic = {
   id: string
   name: string
@@ -431,7 +433,7 @@ function daysSinceLastDisciplineReview(lancamentos: Lancamento[], discId: string
 // Fator de esquecimento cresce com o tempo desde a última revisão da disciplina.
 function forgettingFactor(days: number | null): number {
   if (days === null) return 2.5 // nunca tocada — prioridade máxima
-  return Math.min(2.5, 1 + days / 5)
+  return Math.min(2.5, 1 + days / studyPhase().forgettingDivisor)
 }
 
 // Estado de "pulos" por disciplina (persistido em discipline_skips).
@@ -585,7 +587,11 @@ const TIER_ORDER: Record<TierKey, number> = {
 }
 
 // Janela de manutenção: tópico dominado sem revisão há mais de N dias volta à fila.
+// Encurta conforme a prova se aproxima (21 → 10 → 5 dias), para revisar mais vezes.
 export const MAINTENANCE_DUE_DAYS = 21
+function maintenanceDueDays(): number {
+  return studyPhase().maintenanceDueDays
+}
 // Nº máximo de tópicos de manutenção que podem ressurgir por sessão.
 const MAX_MAINTENANCE_SLOTS = 2
 
@@ -598,7 +604,7 @@ export function maintenanceDueTopics(
       (t) =>
         tierInfo(t.mastery).key === 'dominado' &&
         typeof t.daysSinceReview === 'number' &&
-        t.daysSinceReview >= MAINTENANCE_DUE_DAYS
+        t.daysSinceReview >= maintenanceDueDays()
     )
     .sort((a, b) => (b.daysSinceReview ?? 0) - (a.daysSinceReview ?? 0))
 }
@@ -621,9 +627,13 @@ export function selectActiveTopics(
       const tb = TIER_ORDER[tierInfo(b.mastery).key]
       return ta !== tb ? ta - tb : b.fib - a.fib
     })
-  const untouched = topicsWithMastery
+  // Perto da prova, assuntos novos de baixo peso ficam fora: o tempo vai para o que mais cai.
+  const minFib = studyPhase().minFibNovo
+  const untouchedAll = topicsWithMastery
     .filter((t) => !touchedIds.has(t.id))
     .sort((a, b) => b.fib - a.fib)
+  const filtered = untouchedAll.filter((t) => t.fib >= minFib)
+  const untouched = filtered.length > 0 || touched.length > 0 ? filtered : untouchedAll
 
   let selected = [...touched]
   while (selected.length < cap && untouched.length > 0) selected.push(untouched.shift()!)

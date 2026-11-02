@@ -6,14 +6,13 @@ import { SectionLabel } from '@/components/ui-bits'
 import { useAuth } from '@/lib/auth-context'
 import { useTheme, type ThemeMode } from '@/lib/theme-context'
 import { supabase } from '@/lib/supabase'
+import { EXAM_DATE, studyPhase } from "@/lib/cronograma"
 
 type Props = {
   lancamentos: Lancamento[]
   onReset: () => void
 }
 
-// Data prevista da prova (PMSC Soldado 2026).
-const EXAM_DATE = '2026-07-09'
 
 function PerfilViewInner({ lancamentos, onReset }: Props) {
   const { user, profile } = useAuth()
@@ -112,6 +111,7 @@ function PerfilViewInner({ lancamentos, onReset }: Props) {
       {/* Números do concurso */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
         <Stat icon={CalendarDays} label="Dias até a prova" value={String(stats.diasProva)} />
+        <Stat icon={Target} label={`Dias de estudo · ${studyPhase().label}`} value={String(studyPhase().diasEstudo)} />
         <Stat icon={Clock} label="Horas estudadas" value={`${stats.horas}h`} />
         <Stat icon={ClipboardList} label="Questões feitas" value={String(stats.totalQ)} />
         <Stat
