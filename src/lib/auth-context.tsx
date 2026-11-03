@@ -58,8 +58,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Ouvinte de mudanças de sessão (login, logout, refresh de token)
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      const next = session?.user ?? null;
+      // Mantém o mesmo objeto se o usuário não mudou (refresh de token ao voltar à aba)
+      // — evita recarregar todos os dados da tela.
+      setUser((prev) => (prev && next && prev.id === next.id ? prev : next));
+      if (event === "TOKEN_REFRESHED") return;
       if (session?.user) {
         // defer para evitar deadlock dentro do callback
         setTimeout(() => fetchProfile(session.user.id), 0);
@@ -72,7 +76,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     supabase.auth
       .getSession()
       .then(({ data: { session } }) => {
-        setUser(session?.user ?? null);
+        const next = session?.user ?? null;
+        setUser((prev) => (prev && next && prev.id === next.id ? prev : next));
         if (session?.user) fetchProfile(session.user.id);
       })
       .finally(() => setLoading(false));
