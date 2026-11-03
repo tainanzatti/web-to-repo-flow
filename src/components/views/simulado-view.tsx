@@ -1,7 +1,7 @@
 // ============================================================================
 // Simulado — prova completa no padrão PMSC: 60 questões + redação, até 5h
 // ============================================================================
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Loader2,
@@ -18,7 +18,11 @@ import {
   Check,
   X,
   Award,
+  Scissors,
+  Highlighter,
+  Eraser,
 } from 'lucide-react'
+import { loadJSON, saveJSON } from '@/lib/storage'
 import { useAuth } from '@/lib/auth-context'
 import { CURRICULUM, type Lancamento } from '@/lib/curriculum'
 import { gerarQuestoesSimulado } from '@/lib/simulado.functions'
@@ -53,6 +57,44 @@ function notaColor(nota: number): string {
   if (nota < 7.5) return 'var(--tier-mid)'
   if (nota < 9) return 'var(--tier-good)'
   return 'var(--tier-mastered)'
+}
+
+type Faixa = { s: number; e: number }
+
+function offsetDe(root: Node, node: Node, off: number): number {
+  let total = 0
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let n: Node | null
+  while ((n = w.nextNode())) {
+    if (n === node) return total + off
+    total += n.textContent?.length ?? 0
+  }
+  return total
+}
+
+function rangeDe(root: Node, s: number, e: number): Range | null {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let n: Node | null
+  let total = 0
+  const r = document.createRange()
+  let ok = false
+  while ((n = w.nextNode())) {
+    const len = n.textContent?.length ?? 0
+    if (!ok && s <= total + len) { r.setStart(n, s - total); ok = true }
+    if (ok && e <= total + len) { r.setEnd(n, e - total); return r }
+    total += len
+  }
+  return null
+}
+
+/** Grifos e alternativas eliminadas, guardados no aparelho por simulado. */
+function useMarcacoes(provaId: string | undefined) {
+  const key = `simulado-marcas:${provaId ?? 'x'}`
+  const [data, setData] = useState<{ el: Record<string, string[]>; gr: Record<string, Faixa[]> }>({ el: {}, gr: {} })
+  useEffect(() => { if (provaId) setData(loadJSON(key, { el: {}, gr: {} })) }, [key, provaId])
+  const update = (fn: (d: typeof data) => typeof data) =>
+    setData((d) => { const n = fn(d); saveJSON(key, n); return n })
+  return { data, update }
 }
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
