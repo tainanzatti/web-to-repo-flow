@@ -1,7 +1,7 @@
 // ============================================================================
 // Simulado — prova completa no padrão PMSC: 60 questões + redação, até 5h
 // ============================================================================
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import {
   Loader2,
@@ -18,7 +18,11 @@ import {
   Check,
   X,
   Award,
+  Scissors,
+  Highlighter,
+  Eraser,
 } from 'lucide-react'
+import { loadJSON, saveJSON } from '@/lib/storage'
 import { useAuth } from '@/lib/auth-context'
 import { CURRICULUM, type Lancamento } from '@/lib/curriculum'
 import { gerarQuestoesSimulado } from '@/lib/simulado.functions'
@@ -53,6 +57,44 @@ function notaColor(nota: number): string {
   if (nota < 7.5) return 'var(--tier-mid)'
   if (nota < 9) return 'var(--tier-good)'
   return 'var(--tier-mastered)'
+}
+
+type Faixa = { s: number; e: number }
+
+function offsetDe(root: Node, node: Node, off: number): number {
+  let total = 0
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let n: Node | null
+  while ((n = w.nextNode())) {
+    if (n === node) return total + off
+    total += n.textContent?.length ?? 0
+  }
+  return total
+}
+
+function rangeDe(root: Node, s: number, e: number): Range | null {
+  const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT)
+  let n: Node | null
+  let total = 0
+  const r = document.createRange()
+  let ok = false
+  while ((n = w.nextNode())) {
+    const len = n.textContent?.length ?? 0
+    if (!ok && s <= total + len) { r.setStart(n, s - total); ok = true }
+    if (ok && e <= total + len) { r.setEnd(n, e - total); return r }
+    total += len
+  }
+  return null
+}
+
+/** Grifos e alternativas eliminadas, guardados no aparelho por simulado. */
+function useMarcacoes(provaId: string | undefined) {
+  const key = `simulado-marcas:${provaId ?? 'x'}`
+  const [data, setData] = useState<{ el: Record<string, string[]>; gr: Record<string, Faixa[]> }>({ el: {}, gr: {} })
+  useEffect(() => { if (provaId) setData(loadJSON(key, { el: {}, gr: {} })) }, [key, provaId])
+  const update = (fn: (d: typeof data) => typeof data) =>
+    setData((d) => { const n = fn(d); saveJSON(key, n); return n })
+  return { data, update }
 }
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
@@ -99,6 +141,36 @@ export function SimuladoView({
   const [prova, setProva] = useState<Simulado | null>(null)
   const [resultado, setResultado] = useState<Simulado | null>(null)
   const [idx, setIdx] = useState(0)
+  const { data: marcas, update: setMarcas } = useMarcacoes(prova?.id)
+  const [pincel, setPincel] = useState(false)
+  const questaoRef = useRef<HTMLDivElement>(null)
+
+  // Pinta os grifos da questão atual (CSS Highlight API — não altera o texto).
+  useEffect(() => {
+    const root = questaoRef.current
+    const reg = (globalThis as unknown as { CSS?: { highlights?: Map<string, unknown> } }).CSS?.highlights
+    const HL = (globalThis as unknown as { Highlight?: new (...r: Range[]) => unknown }).Highlight
+    if (!root || !reg || !HL) return
+    const ranges = (marcas.gr[String(idx)] ?? [])
+      .map((f) => rangeDe(root, f.s, f.e))
+      .filter((r): r is Range => !!r)
+    reg.set('grifo-simulado', new HL(...ranges))
+    return () => { reg.delete('grifo-simulado') }
+  })
+
+  const grifarSelecao = () => {
+    if (!pincel) return
+    const root = questaoRef.current
+    const sel = window.getSelection()
+    if (!root || !sel || sel.isCollapsed || sel.rangeCount === 0) return
+    const r = sel.getRangeAt(0)
+    if (!root.contains(r.startContainer) || !root.contains(r.endContainer)) return
+    const a = offsetDe(root, r.startContainer, r.startOffset)
+    const b = offsetDe(root, r.endContainer, r.endOffset)
+    sel.removeAllRanges()
+    if (b <= a) return
+    setMarcas((d) => ({ ...d, gr: { ...d.gr, [String(idx)]: [...(d.gr[String(idx)] ?? []), { s: a, e: b }] } }))
+  }
   const [progresso, setProgresso] = useState({ feitas: 0, discName: '' })
   const [gerandoErro, setGerandoErro] = useState<string | null>(null)
   const [segundosRestantes, setSegundosRestantes] = useState<number | null>(null)
@@ -450,12 +522,38 @@ export function SimuladoView({
         </div>
 
         {/* Questão */}
-        <div className="rounded-xl border border-border-soft bg-card-raised p-5">
+        <div
+          ref={questaoRef}
+          onMouseUp={grifarSelecao}
+          onTouchEnd={grifarSelecao}
+          className={`rounded-xl border bg-card-raised p-5 ${pincel ? 'cursor-text border-tier-mid/60' : 'border-border-soft'}`}
+        >
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wider text-primary">
               {disc?.name ?? ''}
             </span>
             <span className="font-mono text-[10px] text-faint">{topic?.name ?? ''}</span>
+            <div className="ml-auto flex items-center gap-1" onMouseUp={(e) => e.stopPropagation()}>
+              <button
+                onClick={() => setPincel((v) => !v)}
+                aria-pressed={pincel}
+                title="Pincel: selecione um trecho para grifar"
+                className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition ${
+                  pincel ? 'border-tier-mid bg-tier-mid/15 text-foreground' : 'border-border text-faint hover:text-foreground'
+                }`}
+              >
+                <Highlighter size={12} /> Pincel
+              </button>
+              {(marcas.gr[String(idx)]?.length ?? 0) > 0 && (
+                <button
+                  onClick={() => setMarcas((d) => ({ ...d, gr: { ...d.gr, [String(idx)]: [] } }))}
+                  title="Apagar grifos desta questão"
+                  className="rounded-md border border-border p-1 text-faint transition hover:text-foreground"
+                >
+                  <Eraser size={12} />
+                </button>
+              )}
+            </div>
           </div>
           {q?.texto && (
             <div className="mb-4 max-h-[420px] overflow-y-auto whitespace-pre-line rounded-lg border border-border-soft bg-background p-4 text-[13px] leading-relaxed text-foreground">
@@ -468,11 +566,12 @@ export function SimuladoView({
           <div className="space-y-2">
             {letrasDe(q).map((letra) => {
               const marcada = prova.respostas[String(idx)] === letra
+              const eliminada = (marcas.el[String(idx)] ?? []).includes(letra)
               return (
+                <div key={letra} className="flex items-stretch gap-2">
                 <button
-                  key={letra}
-                  onClick={() => responder(letra)}
-                  className={`flex w-full items-start gap-3 rounded-lg border px-3.5 py-3 text-left text-[13px] leading-snug transition ${
+                  onClick={() => { if (!pincel) responder(letra) }}
+                  className={`flex w-full items-start gap-3 rounded-lg border px-3.5 py-3 text-left text-[13px] leading-snug transition ${eliminada ? 'line-through opacity-40 ' : ''}${
                     marcada
                       ? 'border-primary bg-primary/10 text-foreground'
                       : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
@@ -487,6 +586,24 @@ export function SimuladoView({
                   </span>
                   <span><Rich text={q?.alternativas[letra]} /></span>
                 </button>
+                <button
+                  onMouseUp={(e) => e.stopPropagation()}
+                  onClick={() =>
+                    setMarcas((d) => {
+                      const cur = d.el[String(idx)] ?? []
+                      const next = cur.includes(letra) ? cur.filter((l) => l !== letra) : [...cur, letra]
+                      return { ...d, el: { ...d.el, [String(idx)]: next } }
+                    })
+                  }
+                  aria-label={eliminada ? `Restaurar alternativa ${letra}` : `Eliminar alternativa ${letra}`}
+                  title={eliminada ? 'Restaurar alternativa' : 'Eliminar alternativa'}
+                  className={`shrink-0 rounded-lg border px-2.5 transition ${
+                    eliminada ? 'border-primary/50 bg-primary/10 text-primary' : 'border-border text-faint hover:border-primary/40 hover:text-foreground'
+                  }`}
+                >
+                  <Scissors size={14} />
+                </button>
+                </div>
               )
             })}
           </div>
