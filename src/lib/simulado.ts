@@ -6,9 +6,12 @@ import { CURRICULUM, movingAverageMastery, type Lancamento } from './curriculum'
 export type SimuladoQuestion = {
   disciplinaId: string
   topicoId: string
+  /** Texto-base (opcional) para interpretação/análise. Trechos [[assim]] aparecem grifados. */
+  texto?: string
   enunciado: string
-  alternativas: { A: string; B: string; C: string; D: string }
-  correta: 'A' | 'B' | 'C' | 'D'
+  /** E é opcional apenas para compatibilidade com simulados antigos (4 alternativas). */
+  alternativas: { A: string; B: string; C: string; D: string; E?: string }
+  correta: 'A' | 'B' | 'C' | 'D' | 'E'
   explicacao: string
 }
 
