@@ -26,17 +26,28 @@ function buildPrompt(body: Body): string {
   const total = body.batches.reduce((a, b) => a + b.count, 0)
   return `Você é elaborador de questões do concurso de Soldado da PM de Santa Catarina 2026 (banca Instituto AOCP). Disciplina: ${body.discName}.
 
-Crie exatamente ${total} questões INÉDITAS de múltipla escolha, no estilo AOCP (objetivas, com pegadinhas típicas da banca), distribuídas NESTA ORDEM entre os assuntos:
+Crie exatamente ${total} questões INÉDITAS de múltipla escolha, reproduzindo fielmente o estilo de cobrança do Instituto AOCP em concursos de carreiras policiais (PM, PC, Polícia Penal), distribuídas NESTA ORDEM entre os assuntos:
 ${lista}
 
-Regras:
-- 4 alternativas (A, B, C, D), apenas UMA correta, distribua a correta entre as letras.
-- Enunciado claro; para direito, cobre artigos, prazos e exceções; para português, use trechos curtos de texto quando o assunto pedir.
-- Nível: difícil-médio, igual ao da prova real.
-- "explicacao": 1 a 2 frases dizendo por que a correta está correta e/ou por que as erradas estão erradas.
+Regras de formato:
+- 5 alternativas (A, B, C, D, E), apenas UMA correta; distribua o gabarito de forma equilibrada entre as 5 letras.
+- Varie os modelos de questão, como a AOCP faz:
+  • situação-problema: um caso concreto com policial militar, ocorrência, abordagem, servidor público etc., pedindo a solução jurídica/técnica;
+  • "Assinale a alternativa CORRETA" e "Assinale a alternativa INCORRETA" (escreva CORRETA/INCORRETA em maiúsculas no enunciado), alternando entre elas;
+  • questões com itens em algarismos romanos (I, II, III, IV e, se preciso, V), cada item em uma linha própria dentro do enunciado, pedindo "Está(ão) correta(s)" ou "Está(ão) incorreta(s)", com alternativas do tipo "Apenas I e III.", "Apenas II, III e IV.", "I, II, III e IV.";
+  • questões de "De acordo com a Lei nº ..., ..." cobrando literalidade de artigos, prazos, competências e exceções.
+- Use quebras de linha (\n) para separar parágrafos e itens.
+- Nível: médio-difícil, igual à prova real, com pegadinhas típicas (troca de prazos, "sempre/nunca", competências trocadas).
+
+Regras específicas para LÍNGUA PORTUGUESA:
+- Questões de interpretação, coesão, coerência ou sentido devem vir com um texto-base completo no campo "texto": um texto jornalístico, crônica ou artigo de opinião ORIGINAL de 3 a 5 parágrafos (cerca de 250 a 400 palavras), com título e, ao final, uma referência fictícia entre parênteses. Várias questões podem usar o mesmo texto: repita-o no campo "texto" de cada uma.
+- Questões de gramática (concordância, regência, crase, pontuação, classes de palavras, sintaxe) devem trazer frases ou trechos do texto, e as palavras/expressões a analisar devem aparecer GRIFADAS, marcadas com colchetes duplos, ex.: "No trecho 'Os policiais [[que]] atuaram...', o termo destacado...". Use [[ ]] tanto no texto-base quanto no enunciado e alternativas.
+- Para as demais disciplinas, deixe "texto" vazio ("").
+
+- "explicacao": 1 a 3 frases dizendo por que a correta está correta e por que as principais erradas estão erradas (cite o artigo quando houver).
 
 Responda APENAS com JSON válido, sem cercas de código, no formato:
-{"questions":[{"enunciado":"...","alternativas":{"A":"...","B":"...","C":"...","D":"..."},"correta":"A","explicacao":"..."}]}`
+{"questions":[{"texto":"","enunciado":"...","alternativas":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correta":"A","explicacao":"..."}]}}`
 }
 
 async function callGateway(
@@ -79,6 +90,7 @@ async function callGateway(
 }
 
 type RawQuestion = {
+  texto?: unknown
   enunciado?: unknown
   alternativas?: unknown
   correta?: unknown
@@ -96,7 +108,7 @@ function parseQuestions(text: string): SimuladoQuestion[] {
   } catch {
     return []
   }
-  const letras = ['A', 'B', 'C', 'D'] as const
+  const letras = ['A', 'B', 'C', 'D', 'E'] as const
   const out: SimuladoQuestion[] = []
   for (const q of parsed.questions ?? []) {
     if (typeof q.enunciado !== 'string' || !q.enunciado.trim()) continue
@@ -107,13 +119,15 @@ function parseQuestions(text: string): SimuladoQuestion[] {
       B: typeof alts.B === 'string' ? alts.B : '',
       C: typeof alts.C === 'string' ? alts.C : '',
       D: typeof alts.D === 'string' ? alts.D : '',
+      E: typeof alts.E === 'string' ? alts.E : '',
     }
-    if (Object.values(alternativas).some((v) => !v.trim())) continue
+    if (Object.values(alternativas).some((v) => !v?.trim())) continue
     const correta = String(q.correta ?? '').toUpperCase()
     if (!letras.includes(correta as (typeof letras)[number])) continue
     out.push({
       disciplinaId: '',
       topicoId: '',
+      texto: typeof q.texto === 'string' && q.texto.trim() ? q.texto.trim() : undefined,
       enunciado: q.enunciado.trim(),
       alternativas,
       correta: correta as SimuladoQuestion['correta'],
@@ -136,7 +150,7 @@ export const gerarQuestoesSimulado = createServerFn({ method: 'POST' })
           },
           { role: 'user', content: buildPrompt(data) },
         ],
-        6000
+        16000
       )
       if ('error' in res) return res
       let questions = parseQuestions(res.text)
@@ -150,7 +164,7 @@ export const gerarQuestoesSimulado = createServerFn({ method: 'POST' })
             },
             { role: 'user', content: buildPrompt(data) },
           ],
-          6000
+          16000
         )
         if (!('error' in retry)) {
           const again = parseQuestions(retry.text)

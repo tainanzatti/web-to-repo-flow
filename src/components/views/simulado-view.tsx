@@ -55,8 +55,32 @@ function notaColor(nota: number): string {
   return 'var(--tier-mastered)'
 }
 
-const LETRAS = ['A', 'B', 'C', 'D'] as const
+const LETRAS = ['A', 'B', 'C', 'D', 'E'] as const
 type Letra = (typeof LETRAS)[number]
+
+/** Letras com texto (simulados antigos têm só A–D). */
+function letrasDe(q?: { alternativas: Partial<Record<Letra, string>> }): Letra[] {
+  return LETRAS.filter((l) => !!q?.alternativas[l]?.trim())
+}
+
+/** Renderiza quebras de linha e trechos [[grifados]] como sublinhado. */
+function Rich({ text }: { text?: string }) {
+  if (!text) return null
+  const parts = text.split(/(\[\[[^\]]+\]\])/g)
+  return (
+    <>
+      {parts.map((p, i) =>
+        p.startsWith('[[') && p.endsWith(']]') ? (
+          <u key={i} className="decoration-primary decoration-2 underline-offset-2 font-semibold">
+            {p.slice(2, -2)}
+          </u>
+        ) : (
+          <span key={i}>{p}</span>
+        )
+      )}
+    </>
+  )
+}
 
 export function SimuladoView({
   lancamentos,
@@ -433,9 +457,16 @@ export function SimuladoView({
             </span>
             <span className="font-mono text-[10px] text-faint">{topic?.name ?? ''}</span>
           </div>
-          <p className="mb-4 text-[14px] leading-relaxed text-foreground">{q?.enunciado}</p>
+          {q?.texto && (
+            <div className="mb-4 max-h-[420px] overflow-y-auto whitespace-pre-line rounded-lg border border-border-soft bg-background p-4 text-[13px] leading-relaxed text-foreground">
+              <Rich text={q.texto} />
+            </div>
+          )}
+          <p className="mb-4 whitespace-pre-line text-[14px] leading-relaxed text-foreground">
+            <Rich text={q?.enunciado} />
+          </p>
           <div className="space-y-2">
-            {LETRAS.map((letra) => {
+            {letrasDe(q).map((letra) => {
               const marcada = prova.respostas[String(idx)] === letra
               return (
                 <button
@@ -454,7 +485,7 @@ export function SimuladoView({
                   >
                     {letra}
                   </span>
-                  <span>{q?.alternativas[letra]}</span>
+                  <span><Rich text={q?.alternativas[letra]} /></span>
                 </button>
               )
             })}
@@ -703,15 +734,21 @@ export function SimuladoView({
                     >
                       {certa ? <Check size={11} /> : sua ? <X size={11} /> : '—'}
                     </span>
-                    <span className="min-w-0 flex-1 truncate">{q.enunciado}</span>
+                    <span className="min-w-0 flex-1 truncate">{q.enunciado.replace(/\[\[|\]\]/g, '')}</span>
                     <span className="shrink-0 font-mono text-[10px] text-faint">
                       {sua ?? '—'} → {q.correta}
                     </span>
                   </summary>
                   <div className="mt-2 space-y-1.5 border-t border-border-soft pt-2">
-                    <p className="text-[12px] leading-relaxed text-muted-foreground">{q.enunciado}</p>
+                    {q.texto && (
+                      <details className="text-[11px] text-faint">
+                        <summary className="cursor-pointer">Ver texto-base</summary>
+                        <p className="mt-1 whitespace-pre-line leading-relaxed text-muted-foreground"><Rich text={q.texto} /></p>
+                      </details>
+                    )}
+                    <p className="whitespace-pre-line text-[12px] leading-relaxed text-muted-foreground"><Rich text={q.enunciado} /></p>
                     <div className="space-y-1">
-                      {LETRAS.map((l) => (
+                      {letrasDe(q).map((l) => (
                         <p
                           key={l}
                           className={`text-[11px] leading-snug ${
@@ -722,7 +759,7 @@ export function SimuladoView({
                                 : 'text-faint'
                           }`}
                         >
-                          <strong>{l})</strong> {q.alternativas[l]}
+                          <strong>{l})</strong> <Rich text={q.alternativas[l]} />
                         </p>
                       ))}
                     </div>
