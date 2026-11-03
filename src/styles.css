@@ -205,3 +205,8 @@
   opacity: 1 !important;
 }
 
+
+::highlight(grifo-simulado) {
+  background-color: color-mix(in srgb, var(--tier-mid) 45%, transparent);
+  color: var(--foreground);
+}
