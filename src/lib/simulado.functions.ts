@@ -29,6 +29,13 @@ function buildPrompt(body: Body): string {
 Crie exatamente ${total} questões INÉDITAS de múltipla escolha, reproduzindo fielmente o estilo de cobrança do Instituto AOCP em concursos de carreiras policiais (PM, PC, Polícia Penal), distribuídas NESTA ORDEM entre os assuntos:
 ${lista}
 
+FIDELIDADE (obrigatório):
+- Cada questão deve tratar ESTRITAMENTE do assunto indicado, com conteúdo conforme a lei, súmula ou norma gramatical vigente. Não misture assuntos.
+- Antes de redigir as alternativas, defina a resposta correta com base no texto legal/doutrina; depois crie as 4 erradas com erros objetivos e verificáveis (sem ambiguidade, sem duas defensáveis).
+- Em questões com itens (I, II, III...), confira item por item e garanta que a alternativa marcada em "correta" corresponda exatamente à combinação de itens verdadeiros.
+- Em CORRETA/INCORRETA, confira que só UMA alternativa atende ao comando.
+- "correta", "explicacao" e "comentarios" devem ser coerentes entre si.
+
 Regras de formato:
 - 5 alternativas (A, B, C, D, E), apenas UMA correta; distribua o gabarito de forma equilibrada entre as 5 letras.
 - Varie os modelos de questão, como a AOCP faz:
@@ -56,7 +63,8 @@ Responda APENAS com JSON válido, sem cercas de código, no formato:
 
 async function callGateway(
   messages: { role: string; content: string }[],
-  maxTokens: number
+  maxTokens: number,
+  model = 'google/gemini-3-flash-preview'
 ): Promise<{ text: string } | { error: string }> {
   if (!process.env.LOVABLE_API_KEY) {
     console.error('[AI] LOVABLE_API_KEY ausente no ambiente do servidor')
@@ -70,7 +78,7 @@ async function callGateway(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'google/gemini-3-flash-preview',
+        model,
         messages,
         max_completion_tokens: maxTokens,
       }),
@@ -147,41 +155,60 @@ function parseQuestions(text: string): SimuladoQuestion[] {
   return out
 }
 
+// Resolve as questões às cegas (modelo mais forte) e mantém só as que batem com o gabarito.
+async function verificar(qs: SimuladoQuestion[]): Promise<SimuladoQuestion[]> {
+  if (!qs.length) return qs
+  const lista = qs
+    .map((q, i) => {
+      const alts = (Object.entries(q.alternativas) as [string, string][]).map(([l, t]) => `${l}) ${t}`).join('\n')
+      return `### Questão ${i}\n${q.texto ? `Texto-base:\n${q.texto}\n\n` : ''}${q.enunciado}\n${alts}`
+    })
+    .join('\n\n')
+  const res = await callGateway(
+    [
+      { role: 'system', content: 'Você responde exclusivamente com JSON válido, sem cercas de código.' },
+      {
+        role: 'user',
+        content: `Você é revisor jurídico e de língua portuguesa de concursos (banca AOCP). Resolva cada questão abaixo com rigor, conforme a legislação, súmulas e norma culta vigentes. Para itens I, II, III..., avalie cada item antes de escolher. Se a questão tiver mais de uma alternativa defensável ou nenhuma correta, marque "valida": false.\n\n${lista}\n\nResponda APENAS: {"respostas":[{"i":0,"correta":"A","valida":true}]}`,
+      },
+    ],
+    8000,
+    'google/gemini-2.5-pro'
+  )
+  if ('error' in res) return qs // sem revisor, mantém
+  const c = res.text.trim()
+  const a = c.indexOf('{'), b = c.lastIndexOf('}')
+  try {
+    const p = JSON.parse(c.slice(a, b + 1)) as { respostas?: { i?: number; correta?: string; valida?: boolean }[] }
+    const map = new Map((p.respostas ?? []).map((r) => [Number(r.i), r]))
+    return qs.filter((q, i) => {
+      const r = map.get(i)
+      if (!r) return true
+      return r.valida !== false && String(r.correta ?? '').toUpperCase() === q.correta
+    })
+  } catch {
+    return qs
+  }
+}
+
 export const gerarQuestoesSimulado = createServerFn({ method: 'POST' })
   .inputValidator((data: unknown) => inputSchema.parse(data))
   .handler(
     async ({ data }): Promise<{ questions: SimuladoQuestion[] } | { error: string }> => {
       const total = data.batches.reduce((a, b) => a + b.count, 0)
-      const res = await callGateway(
-        [
-          {
-            role: 'system',
-            content: 'Você responde exclusivamente com JSON válido, sem cercas de código.',
-          },
-          { role: 'user', content: buildPrompt(data) },
-        ],
-        16000
-      )
-      if ('error' in res) return res
-      let questions = parseQuestions(res.text)
-      if (questions.length < total) {
-        // Uma tentativa de recuperação quando vierem menos questões que o pedido.
-        const retry = await callGateway(
-          [
-            {
-              role: 'system',
-              content: 'Você responde exclusivamente com JSON válido, sem cercas de código.',
-            },
-            { role: 'user', content: buildPrompt(data) },
-          ],
-          16000
-        )
-        if (!('error' in retry)) {
-          const again = parseQuestions(retry.text)
-          if (again.length > questions.length) questions = again
-        }
+      const msgs = [
+        { role: 'system', content: 'Você responde exclusivamente com JSON válido, sem cercas de código.' },
+        { role: 'user', content: buildPrompt(data) },
+      ]
+      let questions: SimuladoQuestion[] = []
+      let lastError = ''
+      for (let tent = 0; tent < 3 && questions.length < total; tent++) {
+        const res = await callGateway(msgs, 16000)
+        if ('error' in res) { lastError = res.error; if (tent === 0 && !questions.length) return res; continue }
+        const ok = await verificar(parseQuestions(res.text))
+        questions = questions.concat(ok).slice(0, total)
       }
-      if (questions.length === 0) return { error: 'A IA não retornou questões válidas. Tente novamente.' }
+      if (questions.length === 0) return { error: lastError || 'A IA não retornou questões válidas. Tente novamente.' }
       return { questions }
     }
   )
