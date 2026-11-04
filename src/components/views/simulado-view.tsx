@@ -141,6 +141,9 @@ export function SimuladoView({
   const [prova, setProva] = useState<Simulado | null>(null)
   const [resultado, setResultado] = useState<Simulado | null>(null)
   const [idx, setIdx] = useState(0)
+  /** Alternativa escolhida mas ainda não confirmada, por questão. */
+  const [selecao, setSelecao] = useState<Record<string, Letra>>({})
+
   const { data: marcas, update: setMarcas } = useMarcacoes(prova?.id)
   const [pincel, setPincel] = useState(false)
   const questaoRef = useRef<HTMLDivElement>(null)
@@ -234,7 +237,9 @@ export function SimuladoView({
       const saved = await insertSimulado(user.id, all)
       setProva(saved)
       setIdx(0)
+      setSelecao({})
       setTextoRedacao('')
+
       setFase('prova')
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e)
@@ -247,7 +252,9 @@ export function SimuladoView({
   function retomar(s: Simulado) {
     setProva(s)
     setIdx(0)
+    setSelecao({})
     setTextoRedacao(s.redacaoTexto ?? '')
+
     setFase(s.notaObjetiva !== null ? 'redacao' : 'prova')
   }
 
@@ -274,14 +281,31 @@ export function SimuladoView({
   }, [fase, prova])
 
   // ---------- Respostas ----------
+  /** Só escolhe: a resposta é confirmada no botão "Responder". */
+  function marcarPendencia(letra: Letra) {
+    if (!prova || prova.respostas[String(idx)] !== undefined) return
+    setSelecao((s) => {
+      const next = { ...s }
+      if (next[String(idx)] === letra) delete next[String(idx)]
+      else next[String(idx)] = letra
+      return next
+    })
+  }
+
   function responder(letra: Letra) {
     if (!prova || prova.respostas[String(idx)] !== undefined) return
     const respostas = { ...prova.respostas, [String(idx)]: letra }
     setProva({ ...prova, respostas })
+    setSelecao((s) => {
+      const n = { ...s }
+      delete n[String(idx)]
+      return n
+    })
     updateSimulado(prova.id, { respostas }).catch((err) =>
       console.error('Erro ao salvar resposta:', err)
     )
   }
+
 
   async function finalizarObjetiva() {
     if (!prova) return
