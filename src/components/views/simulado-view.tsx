@@ -589,40 +589,53 @@ export function SimuladoView({
           </p>
           <div className="space-y-2">
             {letrasDe(q).map((letra) => {
-              const marcada = prova.respostas[String(idx)] === letra
               const respondida = prova.respostas[String(idx)] !== undefined
+              const marcada = prova.respostas[String(idx)] === letra
+              const pendente = selecao[String(idx)] === letra
               const eliminada = (marcas.el[String(idx)] ?? []).includes(letra)
               return (
                 <div key={letra} className="flex items-stretch gap-2">
                 <div
                   role="button"
                   tabIndex={0}
-                  onClick={() => { if (!pincel && !(window.getSelection()?.toString())) responder(letra) }}
-                  onKeyDown={(e) => { if (!pincel && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); responder(letra) } }}
+                  aria-pressed={pendente || marcada}
+                  onClick={() => { if (!pincel && !respondida && !(window.getSelection()?.toString())) marcarPendencia(letra) }}
+                  onKeyDown={(e) => { if (!pincel && !respondida && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); marcarPendencia(letra) } }}
                   className={`flex w-full items-start gap-3 rounded-lg border px-3.5 py-3 text-left text-[13px] leading-snug transition ${pincel ? 'cursor-text select-text ' : 'cursor-pointer '}${respondida && letra === q?.correta ? 'ring-2 ring-tier-high ' : ''}${eliminada ? 'line-through opacity-40 ' : ''}${
                     marcada
                       ? 'border-primary bg-primary/10 text-foreground'
-                      : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
+                      : pendente
+                        ? 'border-primary/70 border-dashed bg-primary/5 text-foreground'
+                        : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
                   }`}
                 >
                   <span
                     className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-display text-[11px] font-bold ${
-                      marcada ? 'bg-primary text-primary-foreground' : 'bg-card-raised text-faint'
+                      marcada || pendente ? 'bg-primary text-primary-foreground' : 'bg-card-raised text-faint'
                     }`}
                   >
                     {letra}
                   </span>
                   <span><Rich text={q?.alternativas[letra]} /></span>
+
                 </div>
                 <button
                   onMouseUp={(e) => e.stopPropagation()}
-                  onClick={() =>
+                  onClick={() => {
+                    const cur = marcas.el[String(idx)] ?? []
+                    if (!cur.includes(letra))
+                      setSelecao((s) => {
+                        const n = { ...s }
+                        if (n[String(idx)] === letra) delete n[String(idx)]
+                        return n
+                      })
                     setMarcas((d) => {
-                      const cur = d.el[String(idx)] ?? []
-                      const next = cur.includes(letra) ? cur.filter((l) => l !== letra) : [...cur, letra]
+                      const c = d.el[String(idx)] ?? []
+                      const next = c.includes(letra) ? c.filter((l) => l !== letra) : [...c, letra]
                       return { ...d, el: { ...d.el, [String(idx)]: next } }
                     })
-                  }
+                  }}
+
                   aria-label={eliminada ? `Restaurar alternativa ${letra}` : `Eliminar alternativa ${letra}`}
                   title={eliminada ? 'Restaurar alternativa' : 'Eliminar alternativa'}
                   className={`shrink-0 rounded-lg border px-2.5 transition ${
@@ -635,7 +648,29 @@ export function SimuladoView({
               )
             })}
           </div>
+          {q && prova.respostas[String(idx)] === undefined && (
+            <div className="mt-4 flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => {
+                  const l = selecao[String(idx)]
+                  if (l) responder(l)
+                }}
+                disabled={!selecao[String(idx)]}
+                className="flex items-center gap-2 rounded-lg bg-primary px-4 py-2.5 font-display text-[13px] font-bold text-primary-foreground transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Check size={15} />
+                Responder
+                {selecao[String(idx)] ? ` ${selecao[String(idx)]}` : ''}
+              </button>
+              <span className="text-[11px] text-faint">
+                {selecao[String(idx)]
+                  ? 'Confirme em Responder — a resposta não é salva sozinha.'
+                  : 'Toque numa alternativa e depois em Responder.'}
+              </span>
+            </div>
+          )}
           {q && prova.respostas[String(idx)] !== undefined && (() => {
+
             const sua = prova.respostas[String(idx)]
             const acertou = sua === q.correta
             return (
