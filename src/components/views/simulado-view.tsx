@@ -275,7 +275,7 @@ export function SimuladoView({
 
   // ---------- Respostas ----------
   function responder(letra: Letra) {
-    if (!prova) return
+    if (!prova || prova.respostas[String(idx)] !== undefined) return
     const respostas = { ...prova.respostas, [String(idx)]: letra }
     setProva({ ...prova, respostas })
     updateSimulado(prova.id, { respostas }).catch((err) =>
@@ -566,12 +566,16 @@ export function SimuladoView({
           <div className="space-y-2">
             {letrasDe(q).map((letra) => {
               const marcada = prova.respostas[String(idx)] === letra
+              const respondida = prova.respostas[String(idx)] !== undefined
               const eliminada = (marcas.el[String(idx)] ?? []).includes(letra)
               return (
                 <div key={letra} className="flex items-stretch gap-2">
-                <button
-                  onClick={() => { if (!pincel) responder(letra) }}
-                  className={`flex w-full items-start gap-3 rounded-lg border px-3.5 py-3 text-left text-[13px] leading-snug transition ${eliminada ? 'line-through opacity-40 ' : ''}${
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => { if (!pincel && !(window.getSelection()?.toString())) responder(letra) }}
+                  onKeyDown={(e) => { if (!pincel && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); responder(letra) } }}
+                  className={`flex w-full items-start gap-3 rounded-lg border px-3.5 py-3 text-left text-[13px] leading-snug transition ${pincel ? 'cursor-text select-text ' : 'cursor-pointer '}${respondida && letra === q?.correta ? 'ring-2 ring-tier-high ' : ''}${eliminada ? 'line-through opacity-40 ' : ''}${
                     marcada
                       ? 'border-primary bg-primary/10 text-foreground'
                       : 'border-border bg-background text-muted-foreground hover:border-primary/40 hover:text-foreground'
@@ -585,7 +589,7 @@ export function SimuladoView({
                     {letra}
                   </span>
                   <span><Rich text={q?.alternativas[letra]} /></span>
-                </button>
+                </div>
                 <button
                   onMouseUp={(e) => e.stopPropagation()}
                   onClick={() =>
@@ -607,6 +611,28 @@ export function SimuladoView({
               )
             })}
           </div>
+          {q && prova.respostas[String(idx)] !== undefined && (() => {
+            const sua = prova.respostas[String(idx)]
+            const acertou = sua === q.correta
+            return (
+              <div className={`mt-4 rounded-lg border p-4 text-[13px] leading-relaxed ${acertou ? 'border-tier-high/50 bg-tier-high/10' : 'border-destructive/50 bg-destructive/10'}`}>
+                <p className="font-display font-bold text-foreground">
+                  {acertou ? `Certo! Resposta ${q.correta}.` : `Errado. Você marcou ${sua}; a correta é ${q.correta}.`}
+                </p>
+                {q.explicacao && <p className="mt-2 text-foreground"><Rich text={q.explicacao} /></p>}
+                {q.comentarios && (
+                  <ul className="mt-3 space-y-1.5">
+                    {letrasDe(q).map((l) => q.comentarios?.[l] ? (
+                      <li key={l} className="text-muted-foreground">
+                        <strong className={l === q.correta ? 'text-foreground' : ''}>{l} {l === q.correta ? '(correta)' : '(errada)'}:</strong>{' '}
+                        <Rich text={q.comentarios[l]} />
+                      </li>
+                    ) : null)}
+                  </ul>
+                )}
+              </div>
+            )
+          })()}
         </div>
 
         {/* Anterior / próxima */}

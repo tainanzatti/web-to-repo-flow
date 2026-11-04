@@ -44,10 +44,14 @@ Regras específicas para LÍNGUA PORTUGUESA:
 - Questões de gramática (concordância, regência, crase, pontuação, classes de palavras, sintaxe) devem trazer frases ou trechos do texto, e as palavras/expressões a analisar devem aparecer GRIFADAS, marcadas com colchetes duplos, ex.: "No trecho 'Os policiais [[que]] atuaram...', o termo destacado...". Use [[ ]] tanto no texto-base quanto no enunciado e alternativas.
 - Para as demais disciplinas, deixe "texto" vazio ("").
 
-- "explicacao": 1 a 3 frases dizendo por que a correta está correta e por que as principais erradas estão erradas (cite o artigo quando houver).
+Regras para disciplinas de DIREITO e LEGISLAÇÃO:
+- Além da letra da lei, cobre JURISPRUDÊNCIA e ENTENDIMENTOS SUMULADOS do STF e do STJ (súmulas, súmulas vinculantes, teses de repercussão geral e recursos repetitivos, informativos relevantes) e do TJSC quando pertinente, como a AOCP faz. Pelo menos 1 a cada 3 questões de Direito deve envolver jurisprudência ou súmula, citando-a corretamente (ex.: "Conforme a Súmula Vinculante nº 11 do STF..."). Use apenas súmulas e entendimentos reais e vigentes; não invente números.
+
+- "explicacao": 1 a 3 frases dizendo por que a correta está correta e por que as principais erradas estão erradas (cite o artigo, a súmula ou o julgado quando houver).
+- "comentarios": para CADA alternativa (A a E), 1 a 2 frases explicando por que ela está certa ou o que exatamente está errado nela.
 
 Responda APENAS com JSON válido, sem cercas de código, no formato:
-{"questions":[{"texto":"","enunciado":"...","alternativas":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correta":"A","explicacao":"..."}]}}`
+{"questions":[{"texto":"","enunciado":"...","alternativas":{"A":"...","B":"...","C":"...","D":"...","E":"..."},"correta":"A","explicacao":"...","comentarios":{"A":"...","B":"...","C":"...","D":"...","E":"..."}}]}}`
 }
 
 async function callGateway(
@@ -95,6 +99,7 @@ type RawQuestion = {
   alternativas?: unknown
   correta?: unknown
   explicacao?: unknown
+  comentarios?: unknown
 }
 
 function parseQuestions(text: string): SimuladoQuestion[] {
@@ -124,7 +129,12 @@ function parseQuestions(text: string): SimuladoQuestion[] {
     if (Object.values(alternativas).some((v) => !v?.trim())) continue
     const correta = String(q.correta ?? '').toUpperCase()
     if (!letras.includes(correta as (typeof letras)[number])) continue
+    const cm = q.comentarios as Record<string, unknown> | undefined
+    const comentarios: SimuladoQuestion['comentarios'] = {}
+    if (cm && typeof cm === 'object')
+      for (const l of letras) if (typeof cm[l] === 'string' && (cm[l] as string).trim()) comentarios[l] = (cm[l] as string).trim()
     out.push({
+      comentarios: Object.keys(comentarios).length ? comentarios : undefined,
       disciplinaId: '',
       topicoId: '',
       texto: typeof q.texto === 'string' && q.texto.trim() ? q.texto.trim() : undefined,

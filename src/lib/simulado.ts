@@ -13,6 +13,8 @@ export type SimuladoQuestion = {
   alternativas: { A: string; B: string; C: string; D: string; E?: string }
   correta: 'A' | 'B' | 'C' | 'D' | 'E'
   explicacao: string
+  /** Comentário de cada alternativa (por que está certa/errada). */
+  comentarios?: Partial<Record<'A' | 'B' | 'C' | 'D' | 'E', string>>
 }
 
 export const SIMULADO_DISTRIBUTION: { discId: string; count: number }[] = [
