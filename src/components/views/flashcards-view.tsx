@@ -120,7 +120,7 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
     <div className="mx-auto max-w-2xl space-y-5">
       <div className="grid grid-cols-3 gap-3">
         <Stat label="Assuntos para revisar" value={String(pendentes)} />
-        <Stat label="Acertos" value={String(placar.acertos)} className="text-tier-high" />
+        <Stat label="Acertos" value={String(placar.acertos)} className="text-tier-good" />
         <Stat label="Erros" value={String(placar.erros)} className="text-destructive" />
       </div>
 
@@ -175,7 +175,7 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
                     onClick={() => setEscolha(i)}
                     className={`flex w-full items-start gap-3 rounded-lg border px-4 py-3 text-left text-[13px] transition ${
                       certa
-                        ? 'border-tier-high bg-tier-high/10'
+                        ? 'border-tier-good bg-tier-good/10'
                         : errada
                           ? 'border-destructive bg-destructive/10'
                           : sel
@@ -185,7 +185,7 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
                   >
                     <span className="font-mono font-bold text-primary">{i === 0 ? 'A' : 'B'}</span>
                     <span className="flex-1 text-foreground">{alt}</span>
-                    {certa && <Check size={16} className="text-tier-high" />}
+                    {certa && <Check size={16} className="text-tier-good" />}
                     {errada && <X size={16} className="text-destructive" />}
                   </button>
                 )
@@ -203,7 +203,7 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
                 <>
                   <div
                     className={`rounded-lg border p-3 text-[13px] ${
-                      escolha === card.correta ? 'border-tier-high/40 bg-tier-high/5' : 'border-destructive/40 bg-destructive/5'
+                      escolha === card.correta ? 'border-tier-good/40 bg-tier-good/5' : 'border-destructive/40 bg-destructive/5'
                     }`}
                   >
                     <p className="font-bold text-foreground">
