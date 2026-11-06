@@ -170,3 +170,50 @@ Responda APENAS com JSON válido, sem markdown, no formato:
     }
   })
 
+
+// ---------- Flashcards ----------
+
+export type Flashcard = { pergunta: string; alternativas: [string, string]; correta: 0 | 1; explicacao: string }
+
+export const gerarFlashcards = createServerFn({ method: 'POST' })
+  .inputValidator((data: unknown) =>
+    z.object({ discName: z.string(), topicName: z.string() }).parse(data),
+  )
+  .handler(async ({ data }): Promise<{ cards: Flashcard[] } | { error: string }> => {
+    const prompt = `Você é professor de cursinho para o concurso de Soldado da PMSC 2026 (banca Instituto AOCP). Disciplina: ${data.discName}. Tópico: "${data.topicName}".
+
+Crie EXATAMENTE 3 flashcards de revisão sobre o que mais cai deste tópico. Cada flashcard tem uma pergunta curta e objetiva e 2 alternativas (apenas uma correta, a outra uma pegadinha plausível típica da banca). Seja fiel à lei, doutrina e jurisprudência vigentes; não invente artigos. Varie a posição da correta. A explicação deve ter 1 a 3 frases justificando e citando o fundamento (artigo/súmula quando houver).
+
+Responda APENAS com JSON válido no formato:
+{"cards":[{"pergunta":"...","alternativas":["...","..."],"correta":0,"explicacao":"..."}]}`
+    const res = await callGateway(
+      [
+        { role: 'system', content: 'Você responde exclusivamente com JSON válido, sem cercas de código.' },
+        { role: 'user', content: prompt },
+      ],
+      1500,
+    )
+    if ('error' in res) return res
+    const t = res.text
+    const a = t.indexOf('{')
+    const b = t.lastIndexOf('}')
+    try {
+      const p = JSON.parse(t.slice(a, b + 1)) as { cards?: unknown[] }
+      const cards: Flashcard[] = []
+      for (const c of p.cards ?? []) {
+        const x = c as Record<string, unknown>
+        const alts = x.alternativas as unknown[]
+        if (typeof x.pergunta !== 'string' || !Array.isArray(alts) || alts.length < 2) continue
+        cards.push({
+          pergunta: x.pergunta,
+          alternativas: [String(alts[0]), String(alts[1])],
+          correta: Number(x.correta) === 1 ? 1 : 0,
+          explicacao: typeof x.explicacao === 'string' ? x.explicacao : '',
+        })
+      }
+      if (cards.length === 0) return { error: 'A IA não gerou flashcards válidos.' }
+      return { cards: cards.slice(0, 3) }
+    } catch {
+      return { error: 'Não foi possível interpretar os flashcards.' }
+    }
+  })
