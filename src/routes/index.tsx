@@ -19,6 +19,7 @@ import {
   LogOut,
   Loader2,
   Timer,
+  Layers,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -54,6 +55,7 @@ import { LancamentoView } from '@/components/views/lancamento-view'
 import { ComparativoView } from '@/components/views/comparativo-view'
 import { RankingView } from '@/components/views/ranking-view'
 import { SimuladoView } from '@/components/views/simulado-view'
+import { FlashcardsView } from '@/components/views/flashcards-view'
 import { PerfilView } from '@/components/views/perfil-view'
 import { ConcluirModal } from '@/components/concluir-modal'
 import { MaterialModal } from '@/components/material-modal'
@@ -99,6 +101,7 @@ type ViewId =
   | 'desempenho'
   | 'lancamento'
   | 'simulado'
+  | 'flashcards'
   | 'comparativo'
   | 'ranking'
   | 'perfil'
@@ -119,6 +122,7 @@ const NAV: { section: string; items: { id: ViewId; label: string; icon: LucideIc
     items: [
       { id: 'lancamento', label: 'Lançamento de questões', icon: ClipboardList },
       { id: 'simulado', label: 'Simulados', icon: FileText },
+      { id: 'flashcards', label: 'Flashcards', icon: Layers },
       { id: 'comparativo', label: 'Comparativo', icon: LineChart },
       { id: 'ranking', label: 'Ranking', icon: Trophy },
     ],
@@ -140,6 +144,7 @@ const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = {
     title: 'Simulados',
     subtitle: 'Prova completa no padrão PMSC — 60 questões + redação',
   },
+  flashcards: { title: 'Flashcards', subtitle: 'Revisão de assuntos parados há 7+ dias ou nunca vistos' },
   comparativo: { title: 'Comparativo', subtitle: 'Seus resultados em relação aos outros alunos' },
   ranking: { title: 'Ranking', subtitle: 'Suas posições no ranking da plataforma' },
   perfil: { title: 'Meu perfil', subtitle: 'Assinatura, plano e dados pessoais' },
@@ -154,6 +159,7 @@ const VIEW_IDS: ViewId[] = [
   'desempenho',
 'lancamento',
   'simulado',
+  'flashcards',
   'comparativo',
   'ranking',
   'perfil',
@@ -525,6 +531,9 @@ function OperacaoPMSC() {
                 lancamentos={lancamentos}
                 onLancamentosAdded={(rows) => setLancamentos((prev) => [...prev, ...rows])}
               />
+            )}
+            {view === 'flashcards' && (
+              <FlashcardsView lancamentos={lancamentos} onAdd={addLancamento} />
             )}
             {view === 'lancamento' && (
               <LancamentoView

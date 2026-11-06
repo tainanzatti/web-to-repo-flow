@@ -123,7 +123,7 @@ export async function deleteMaterialLink(id: string): Promise<void> {
 
 // ---------- Materiais gerados por IA (lei seca, resumo, questões) ----------
 
-export type AiMaterialKind = 'leiseca' | 'resumo' | 'questoes'
+export type AiMaterialKind = 'leiseca' | 'resumo' | 'questoes' | 'flashcards'
 
 export async function fetchAiMaterial(
   userId: string,
