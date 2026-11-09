@@ -21,6 +21,7 @@ import {
   type Lancamento,
 } from '@/lib/curriculum'
 import { SectionLabel } from '@/components/ui-bits'
+import { GamificacaoCard } from '@/components/gamificacao-card'
 import { useAuth } from '@/lib/auth-context'
 
 type Props = {
@@ -170,6 +171,8 @@ function PainelViewInner({ lancamentos, skips = {}, onEstudar, onVerNucleo, onOp
           </button>
         </div>
       </div>
+
+      <GamificacaoCard lancamentos={lancamentos} />
 
       {/* Estatísticas */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
