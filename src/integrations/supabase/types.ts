@@ -47,6 +47,42 @@ export type Database = {
         }
         Relationships: []
       }
+      caderno_erros: {
+        Row: {
+          created_at: string
+          disciplina_id: string
+          id: string
+          origem: string
+          questao: Json
+          resolvida: boolean
+          resposta: string | null
+          topico_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          disciplina_id: string
+          id?: string
+          origem: string
+          questao: Json
+          resolvida?: boolean
+          resposta?: string | null
+          topico_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          disciplina_id?: string
+          id?: string
+          origem?: string
+          questao?: Json
+          resolvida?: boolean
+          resposta?: string | null
+          topico_id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       daily_briefings: {
         Row: {
           briefing_date: string
