@@ -20,6 +20,7 @@ import {
   Loader2,
   Timer,
   Layers,
+  NotebookPen,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import {
@@ -56,6 +57,7 @@ import { ComparativoView } from '@/components/views/comparativo-view'
 import { RankingView } from '@/components/views/ranking-view'
 import { SimuladoView } from '@/components/views/simulado-view'
 import { FlashcardsView } from '@/components/views/flashcards-view'
+import { CadernoErrosView } from '@/components/views/caderno-erros-view'
 import { PerfilView } from '@/components/views/perfil-view'
 import { ConcluirModal } from '@/components/concluir-modal'
 import { MaterialModal } from '@/components/material-modal'
@@ -102,6 +104,7 @@ type ViewId =
   | 'lancamento'
   | 'simulado'
   | 'flashcards'
+  | 'erros'
   | 'comparativo'
   | 'ranking'
   | 'perfil'
@@ -123,6 +126,7 @@ const NAV: { section: string; items: { id: ViewId; label: string; icon: LucideIc
       { id: 'lancamento', label: 'Lançamento de questões', icon: ClipboardList },
       { id: 'simulado', label: 'Simulados', icon: FileText },
       { id: 'flashcards', label: 'Flashcards', icon: Layers },
+      { id: 'erros', label: 'Caderno de erros', icon: NotebookPen },
       { id: 'comparativo', label: 'Comparativo', icon: LineChart },
       { id: 'ranking', label: 'Ranking', icon: Trophy },
     ],
@@ -144,6 +148,7 @@ const VIEW_TITLES: Record<ViewId, { title: string; subtitle: string }> = {
     title: 'Simulados',
     subtitle: 'Prova completa no padrão PMSC — 60 questões + redação',
   },
+  erros: { title: 'Caderno de erros', subtitle: 'Refaça as questões que você errou' },
   flashcards: { title: 'Flashcards', subtitle: 'Revisão de assuntos parados há 7+ dias ou nunca vistos' },
   comparativo: { title: 'Comparativo', subtitle: 'Seus resultados em relação aos outros alunos' },
   ranking: { title: 'Ranking', subtitle: 'Suas posições no ranking da plataforma' },
@@ -160,6 +165,7 @@ const VIEW_IDS: ViewId[] = [
 'lancamento',
   'simulado',
   'flashcards',
+  'erros',
   'comparativo',
   'ranking',
   'perfil',
@@ -535,6 +541,7 @@ function OperacaoPMSC() {
             {view === 'flashcards' && (
               <FlashcardsView lancamentos={lancamentos} onAdd={addLancamento} />
             )}
+            {view === 'erros' && <CadernoErrosView onAdd={addLancamento} />}
             {view === 'lancamento' && (
               <LancamentoView
                 lancamentos={lancamentos}

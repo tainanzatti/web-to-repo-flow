@@ -515,3 +515,68 @@ export async function deleteSimulado(id: string): Promise<void> {
   const { error } = await supabase.from('simulados').delete().eq('id', id)
   if (error) throw error
 }
+
+// ---------- Caderno de erros ----------
+export type ErroQuestao = {
+  texto?: string
+  enunciado: string
+  alternativas: Record<string, string>
+  correta: string
+  explicacao: string
+  comentarios?: Record<string, string>
+}
+export type ErroOrigem = 'simulado' | 'flashcard'
+export type CadernoErro = {
+  id: string
+  origem: ErroOrigem
+  disciplinaId: string
+  topicoId: string
+  questao: ErroQuestao
+  resposta: string | null
+  resolvida: boolean
+  createdAt: string
+}
+
+export async function fetchCadernoErros(userId: string): Promise<CadernoErro[]> {
+  const { data, error } = await supabase
+    .from('caderno_erros')
+    .select('id, origem, disciplina_id, topico_id, questao, resposta, resolvida, created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    origem: r.origem as ErroOrigem,
+    disciplinaId: r.disciplina_id,
+    topicoId: r.topico_id,
+    questao: r.questao as unknown as ErroQuestao,
+    resposta: r.resposta,
+    resolvida: r.resolvida,
+    createdAt: r.created_at,
+  }))
+}
+
+export async function insertCadernoErro(
+  userId: string,
+  e: { origem: ErroOrigem; disciplinaId: string; topicoId: string; questao: ErroQuestao; resposta: string },
+): Promise<void> {
+  const { error } = await supabase.from('caderno_erros').insert({
+    user_id: userId,
+    origem: e.origem,
+    disciplina_id: e.disciplinaId,
+    topico_id: e.topicoId,
+    questao: e.questao as unknown as Json,
+    resposta: e.resposta,
+  })
+  if (error) throw error
+}
+
+export async function setCadernoErroResolvida(id: string, resolvida: boolean): Promise<void> {
+  const { error } = await supabase.from('caderno_erros').update({ resolvida }).eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteCadernoErro(id: string): Promise<void> {
+  const { error } = await supabase.from('caderno_erros').delete().eq('id', id)
+  if (error) throw error
+}
