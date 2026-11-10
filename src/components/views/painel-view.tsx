@@ -33,7 +33,10 @@ type Props = {
 }
 
 const REVIEW_DUE_DAYS = 7
-const today = () => new Date().toISOString().slice(0, 10)
+const today = () => {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+}
 const daysBetween = (a: string, b: string) =>
   Math.round((new Date(a).getTime() - new Date(b).getTime()) / 86400000)
 
@@ -115,7 +118,11 @@ function PainelViewInner({ lancamentos, skips = {}, onEstudar, onVerNucleo, onOp
         const [discId, topicId] = key.split('::')
         return { discId, topicId, dias: daysBetween(hoje, data) }
       })
-      .filter((r) => r.dias >= REVIEW_DUE_DAYS && CURRICULUM[r.discId])
+      .filter(
+        (r) =>
+          r.dias >= REVIEW_DUE_DAYS &&
+          !!CURRICULUM[r.discId]?.topics.some((t) => t.id === r.topicId),
+      )
       .sort((a, b) => b.dias - a.dias)
   }, [lancamentos])
 
@@ -239,7 +246,7 @@ function PainelViewInner({ lancamentos, skips = {}, onEstudar, onVerNucleo, onOp
           <div className="flex items-center justify-between">
             <SectionLabel>REVISÕES VENCENDO</SectionLabel>
             <span className="mb-2 rounded-full bg-primary/15 px-2 py-0.5 font-mono text-[10px] font-bold text-primary">
-              {revisoesVencendo.length} pendentes hoje
+              {revisoesVencendo.length} pendentes
             </span>
           </div>
           {revisoesVencendo.length === 0 ? (
