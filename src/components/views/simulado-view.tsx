@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { loadJSON, saveJSON } from '@/lib/storage'
 import { useAuth } from '@/lib/auth-context'
+import { insertCadernoErro } from '@/lib/db'
 import { CURRICULUM, type Lancamento } from '@/lib/curriculum'
 import { gerarQuestoesSimulado } from '@/lib/simulado.functions'
 import { generateAI, corrigirRedacaoAI } from '@/lib/ai-client'
@@ -304,6 +305,23 @@ export function SimuladoView({
     updateSimulado(prova.id, { respostas }).catch((err) =>
       console.error('Erro ao salvar resposta:', err)
     )
+    const q = prova.questoes[idx]
+    if (q && user && letra !== q.correta) {
+      insertCadernoErro(user.id, {
+        origem: 'simulado',
+        disciplinaId: q.disciplinaId,
+        topicoId: q.topicoId,
+        questao: {
+          texto: q.texto,
+          enunciado: q.enunciado,
+          alternativas: q.alternativas as Record<string, string>,
+          correta: q.correta,
+          explicacao: q.explicacao,
+          comentarios: q.comentarios as Record<string, string> | undefined,
+        },
+        resposta: letra,
+      }).catch((err) => console.error('Erro ao salvar no caderno de erros:', err))
+    }
   }
 
 

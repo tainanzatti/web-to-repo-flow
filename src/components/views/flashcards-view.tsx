@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Check, Eye, Loader2, SkipForward, X } from 'lucide-react'
 import { CURRICULUM, ROTATION_ORDER, movingAverageMastery, type Lancamento } from '@/lib/curriculum'
 import { gerarFlashcards, type Flashcard } from '@/lib/ai.functions'
-import { fetchAiMaterial, upsertAiMaterial } from '@/lib/db'
+import { fetchAiMaterial, insertCadernoErro, upsertAiMaterial } from '@/lib/db'
 import { useAuth } from '@/lib/auth-context'
 import { SectionLabel } from '@/components/ui-bits'
 
@@ -94,6 +94,16 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
     if (escolha === null || !cards || !current) return
     setRevelado(true)
     const acertou = escolha === cards[idx].correta
+    if (!acertou && user) {
+      const c = cards[idx]
+      insertCadernoErro(user.id, {
+        origem: 'flashcard',
+        disciplinaId: current.discId,
+        topicoId: current.topicId,
+        questao: { enunciado: c.pergunta, alternativas: { A: c.alternativas[0], B: c.alternativas[1] }, correta: c.correta === 0 ? 'A' : 'B', explicacao: c.explicacao },
+        resposta: escolha === 0 ? 'A' : 'B',
+      }).catch((err) => console.error('Erro ao salvar no caderno de erros:', err))
+    }
     setPlacar((p) => ({ acertos: p.acertos + (acertou ? 1 : 0), erros: p.erros + (acertou ? 0 : 1) }))
     await onAdd({
       disciplinaId: current.discId,
