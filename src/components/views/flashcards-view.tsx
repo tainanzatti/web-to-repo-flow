@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Check, Eye, Loader2, SkipForward, X } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, Check, Eye, Loader2, SkipForward, X } from 'lucide-react'
 import { CURRICULUM, ROTATION_ORDER, movingAverageMastery, type Lancamento } from '@/lib/curriculum'
 import { gerarFlashcards, type Flashcard } from '@/lib/ai.functions'
 import { fetchAiMaterial, insertCadernoErro, upsertAiMaterial } from '@/lib/db'
@@ -52,6 +52,14 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
   const [loading, setLoading] = useState(false)
   const [erro, setErro] = useState<string | null>(null)
   const [placar, setPlacar] = useState({ acertos: 0, erros: 0 })
+  const [respondidos, setRespondidos] = useState<Record<string, number>>({})
+  const [historico, setHistorico] = useState<Item[]>([])
+  const voltarParaFim = useRef(false)
+  const chave = (it: Item, i: number) => `${it.discId}::${it.topicId}::${i}`
+  const irPara = (it: Item, i: number) => {
+    const r = respondidos[chave(it, i)]
+    setIdx(i); setEscolha(r ?? null); setRevelado(r !== undefined)
+  }
 
   useEffect(() => {
     if (current) return
@@ -65,17 +73,20 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
     setCards(null); setIdx(0); setEscolha(null); setRevelado(false); setErro(null); setLoading(true)
     const disc = CURRICULUM[current.discId]
     const topic = disc.topics.find((t) => t.id === current.topicId)!
+    const abrirInicial = (n: number) => {
+      if (voltarParaFim.current) { voltarParaFim.current = false; irPara(current, n - 1) }
+    }
     ;(async () => {
       try {
         const cached = await fetchAiMaterial(user.id, current.discId, current.topicId, 'flashcards')
         if (cached) {
           const parsed = JSON.parse(cached) as Flashcard[]
-          if (alive && parsed.length) { setCards(parsed); return }
+          if (alive && parsed.length) { setCards(parsed); abrirInicial(parsed.length); return }
         }
         const r = await gerarFlashcards({ data: { discName: disc.name, topicName: topic.name } })
         if ('error' in r) throw new Error(r.error)
         await upsertAiMaterial(user.id, current.discId, current.topicId, 'flashcards', JSON.stringify(r.cards))
-        if (alive) setCards(r.cards)
+        if (alive) { setCards(r.cards); abrirInicial(r.cards.length) }
       } catch (e) {
         if (alive) setErro(e instanceof Error ? e.message : 'Erro ao gerar flashcards.')
       } finally {
@@ -86,14 +97,32 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
   }, [current, user])
 
   const proximoTopico = () => {
-    if (current) setSkipped((s) => [...s, `${current.discId}::${current.topicId}`])
+    if (current) {
+      const c = current
+      setSkipped((s) => [...s, `${c.discId}::${c.topicId}`])
+      setHistorico((h) => [...h, c])
+    }
     setCurrent(null)
   }
+
+  const voltar = () => {
+    if (!current) return
+    if (idx > 0) { irPara(current, idx - 1); return }
+    const prev = historico[historico.length - 1]
+    if (!prev) return
+    setHistorico((h) => h.slice(0, -1))
+    voltarParaFim.current = true
+    setCurrent(prev)
+  }
+  const podeVoltar = !!current && (idx > 0 || historico.length > 0)
 
   const mostrar = async () => {
     if (escolha === null || !cards || !current) return
     setRevelado(true)
     const acertou = escolha === cards[idx].correta
+    const k = chave(current, idx)
+    if (respondidos[k] !== undefined) return
+    setRespondidos((r) => ({ ...r, [k]: escolha }))
     if (!acertou && user) {
       const c = cards[idx]
       insertCadernoErro(user.id, {
@@ -117,7 +146,7 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
 
   const avancar = () => {
     if (!cards) return
-    if (idx + 1 < cards.length) { setIdx(idx + 1); setEscolha(null); setRevelado(false) }
+    if (idx + 1 < cards.length && current) irPara(current, idx + 1)
     else proximoTopico()
   }
 
@@ -149,12 +178,21 @@ export function FlashcardsView({ lancamentos, onAdd }: Props) {
                 {cards && ` · Card ${idx + 1} de ${cards.length}`}
               </p>
             </div>
+            <div className="flex shrink-0 gap-2">
+            <button
+              onClick={voltar}
+              disabled={!podeVoltar}
+              className="flex shrink-0 items-center gap-1 rounded-lg border border-border-soft px-2.5 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground disabled:opacity-40"
+            >
+              <ArrowLeft size={12} /> Voltar
+            </button>
             <button
               onClick={proximoTopico}
               className="flex shrink-0 items-center gap-1 rounded-lg border border-border-soft px-2.5 py-1.5 text-[11px] text-muted-foreground transition hover:text-foreground"
             >
               <SkipForward size={12} /> Pular assunto
             </button>
+            </div>
           </div>
 
           {loading && (
